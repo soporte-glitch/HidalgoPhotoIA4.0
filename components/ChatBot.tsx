@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Placeholder from './Placeholder';
 
@@ -9,11 +8,13 @@ const IconChat = () => (
 
 const ChatBot: React.FC = () => {
   return (
-    <Placeholder 
-      title="Asesor IA Próximamente"
-      description="Nuestro asistente virtual inteligente estará aquí para resolver todas tus dudas sobre presupuestos, paquetes, fechas y más, 24/7."
-      icon={<IconChat />}
-    />
+    <div className="flex flex-col items-center justify-center h-full p-4">
+      <Placeholder 
+        title="Asesor IA Próximamente"
+        description="Nuestro asistente virtual inteligente estará aquí para resolver todas tus dudas sobre presupuestos, paquetes, fechas y más, 24/7."
+        icon={<IconChat />}
+      />
+    </div>
   );
 };
 

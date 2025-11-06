@@ -1,6 +1,6 @@
 {
-  "name": "Copy of Copy of  HidalgoPhotoAI  v4.0",
-  "description": "Suite creativa integral impulsada por IA, que incluye edición fotográfica avanzada, generación de video, asistencia por voz y más, todo potenciado por el kernel HidalgoCore y la tecnología de Google Gemini.",
+  "name": "OmniPhoto Studio Pro 4.8",
+  "description": "Suite de edición fotográfica profesional impulsada por IA. Desarrollado por OmniCorp IA con tecnología de Google Gemini.",
   "requestFramePermissions": [
     "microphone"
   ]

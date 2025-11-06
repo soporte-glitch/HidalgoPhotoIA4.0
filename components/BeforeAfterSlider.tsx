@@ -53,7 +53,7 @@ const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImage, afte
   return (
     <div
       ref={containerRef}
-      className="relative w-full aspect-video overflow-hidden select-none rounded-xl bg-brand-secondary cursor-ew-resize"
+      className="relative w-full h-full overflow-hidden select-none rounded-xl bg-brand-secondary cursor-ew-resize"
       onMouseDown={handleMouseDown}
       onTouchStart={handleMouseDown}
     >

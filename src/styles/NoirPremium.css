@@ -1,0 +1,297 @@
+/* === NoirPremium Theme for OmniPhoto Pro 4.5 === */
+:root {
+  --noir-bg: #100a13;
+  --noir-panel: rgba(23, 16, 28, 0.7);
+  --noir-border: rgba(255, 216, 77, 0.2);
+  --noir-text: #e2dceb;
+  --noir-text-muted: #918ca1;
+  --noir-gold: #ffd84d;
+  --noir-wine: #b7215a;
+  --noir-focus: #ff3df5;
+}
+
+/* --- Component Root --- */
+.editor-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: transparent;
+  padding: 8px;
+  color: var(--noir-text);
+  font-family: 'Poppins', sans-serif;
+}
+
+/* --- Workspace Layout --- */
+.editor-workspace {
+  flex-grow: 1;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  min-height: 0;
+}
+
+.image-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.tools-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--noir-panel);
+  border: 1px solid var(--noir-border);
+  border-radius: 12px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow-y: auto;
+}
+
+.panel-header {
+  text-align: left;
+  border-bottom: 1px solid var(--noir-border);
+  padding-bottom: 12px;
+}
+
+.panel-header h2 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 22px;
+  color: var(--noir-gold);
+  margin: 0;
+}
+
+.panel-header p {
+  font-size: 14px;
+  color: var(--noir-text-muted);
+  margin-top: 4px;
+  max-width: 90%;
+}
+
+.panel-section {
+  padding-bottom: 8px;
+}
+
+.panel-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--noir-gold);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.panel-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--noir-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* --- UI Controls --- */
+.btn-noir-primary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(45deg, var(--noir-focus), var(--noir-wine));
+  color: white;
+  font-weight: bold;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 0 15px rgba(255, 61, 245, 0.4);
+}
+.btn-noir-primary:hover:not(:disabled) { transform: scale(1.03); box-shadow: 0 0 25px rgba(255, 61, 245, 0.7); }
+.btn-noir-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-noir-secondary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--noir-text);
+  font-weight: 500;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.btn-noir-secondary:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.2); }
+.btn-noir-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.button-group { display: flex; gap: 12px; }
+
+.btn-artistic-style {
+  background-color: rgba(0,0,0,0.3);
+  border: 1px solid var(--noir-border);
+  color: var(--noir-text-muted);
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-artistic-style:hover:not(:disabled) {
+  background-color: rgba(255, 216, 77, 0.1);
+  color: var(--noir-gold);
+  border-color: var(--noir-gold);
+}
+.btn-artistic-style:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.prompt-area {
+  width: 100%;
+  min-height: 80px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--noir-border);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--noir-text);
+  font-size: 14px;
+  resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.prompt-area:focus {
+  outline: none;
+  border-color: var(--noir-gold);
+  box-shadow: 0 0 10px rgba(255, 216, 77, 0.3);
+}
+
+.checkbox-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background-color: rgba(0,0,0,0.2);
+  border-radius: 8px;
+}
+.checkbox-control input {
+  height: 1.1em;
+  width: 1.1em;
+  accent-color: var(--noir-focus);
+}
+.checkbox-control label {
+  font-size: 14px;
+  color: var(--noir-text-muted);
+  cursor: pointer;
+}
+
+/* --- Slider Controls --- */
+.slider-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.slider-control .label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.slider-control .label-row .label {
+  color: var(--noir-text-muted);
+  font-weight: 500;
+}
+.slider-control .label-row .value {
+  color: var(--noir-text);
+}
+.slider-control input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 5px;
+  outline: none;
+}
+.slider-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--noir-gold);
+  cursor: pointer;
+  border-radius: 50%;
+  border: 2px solid var(--noir-bg);
+}
+.slider-control input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--noir-gold);
+  cursor: pointer;
+  border-radius: 50%;
+  border: 2px solid var(--noir-bg);
+}
+
+
+/* --- Image Area Specifics --- */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--noir-gold);
+  z-index: 10;
+  backdrop-filter: blur(5px);
+  border-radius: 12px;
+}
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 216, 77, 0.3);
+  border-top-color: var(--noir-gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Override ImageUploader styles to match theme */
+.image-area .relative.flex { /* Target the root of ImageUploader */
+    width: 100%;
+    height: 100%;
+    border: 2px dashed var(--noir-border);
+    background-color: transparent !important;
+}
+.image-area .relative.flex:hover {
+    border-color: var(--noir-gold) !important;
+    background-color: rgba(255, 216, 77, 0.05) !important;
+}
+.image-area .text-brand-accent {
+    color: var(--noir-gold) !important;
+}
+.image-area .text-brand-text {
+    color: var(--noir-text) !important;
+}
+.image-area .text-brand-text-secondary {
+    color: var(--noir-text-muted) !important;
+}
+.image-area .border-brand-secondary {
+    border-color: transparent !important;
+}
+.image-area .bg-brand-primary {
+    background-color: transparent !important;
+}
