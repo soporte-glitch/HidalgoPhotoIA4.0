@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { generateVideoFromImage } from '../services/veoService';
 import type { VideoGenerationConfig, VideoGenerationStatus } from '../services/veoService';
@@ -14,6 +15,7 @@ const CinematicAnimator: React.FC = () => {
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [apiKeySelected, setApiKeySelected] = useState<boolean>(false);
+    const [videoError, setVideoError] = useState<boolean>(false);
 
     const checkApiKey = async () => {
         if (window.aistudio && await window.aistudio.hasSelectedApiKey()) {
@@ -38,6 +40,7 @@ const CinematicAnimator: React.FC = () => {
         setOriginalImage(imageData);
         setVideoUrl(null);
         setError(null);
+        setVideoError(false);
     }, []);
     
     const handleGenerate = async () => {
@@ -45,6 +48,7 @@ const CinematicAnimator: React.FC = () => {
         
         setError(null);
         setVideoUrl(null);
+        setVideoError(false);
         
         const config: VideoGenerationConfig = { prompt, aspectRatio, resolution };
 
@@ -73,7 +77,7 @@ const CinematicAnimator: React.FC = () => {
     };
 
     const isLoading = status.status === 'generating' || status.status === 'polling';
-    const originalImageUrl = originalImage ? `data:${originalImage.mimeType};base64,${originalImage.base64}` : null;
+    const originalImageUrl = originalImage ? `data:${originalImage.mimeType};base664,${originalImage.base64}` : null;
 
     if (!apiKeySelected) {
         return (
@@ -103,8 +107,13 @@ const CinematicAnimator: React.FC = () => {
                         <p className="text-brand-text font-semibold mt-4 text-center px-4">{status.message}</p>
                     </div>
                 )}
-                { videoUrl ? (
-                     <video src={videoUrl} controls autoPlay loop className="max-w-full max-h-full object-contain rounded-lg" />
+                { videoUrl && !videoError ? (
+                     <video src={videoUrl} onError={() => setVideoError(true)} controls autoPlay loop className="max-w-full max-h-full object-contain rounded-lg" />
+                ) : videoError ? (
+                    <div className="text-center text-red-400 p-4">
+                        <h3 className="font-bold">Error al cargar el video</h3>
+                        <p className="text-sm">Intenta generarlo de nuevo.</p>
+                    </div>
                 ) : originalImageUrl ? (
                     <img src={originalImageUrl} alt="Original" className={`max-w-full max-h-full object-contain rounded-lg ${isLoading ? 'opacity-30' : ''}`} />
                 ) : (

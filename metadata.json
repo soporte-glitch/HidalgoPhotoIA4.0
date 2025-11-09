@@ -1,7 +1,9 @@
 {
-  "name": "OmniPhoto Studio Pro 4.8",
-  "description": "Suite de edición fotográfica profesional impulsada por IA. Desarrollado por OmniCorp IA con tecnología de Google Gemini.",
+  "name": "CinemaMagic IA Studio v4.9",
+  "description": "Suite de edición fotográfica y de video profesional impulsada por IA. Desarrollado por OmniCorp IA con tecnología de Google Gemini.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "geolocation",
+    "camera"
   ]
 }

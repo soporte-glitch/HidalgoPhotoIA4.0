@@ -9,12 +9,14 @@ interface NicoleSpeakEventDetail {
 const NicoleVoiceEngine: React.FC = () => {
     // Mensaje de bienvenida inicial
     const [message, setMessage] = useState(
-        "Bienvenido a OmniPhoto Studio Pro 4.8. Los módulos están cargados y el motor de IA está en línea. Estoy lista para asistirte."
+        "Bienvenido a CinemaMagic IA Studio. Los módulos están cargados y el motor de IA está en línea. Estoy lista para asistirte."
     );
 
     useEffect(() => {
-        // Habla el mensaje de bienvenida inicial solo una vez al montar el componente
-        speak(message);
+        // ELIMINADO: speak(message);
+        // Esta línea causaba una voz de bienvenida que se solapaba con el
+        // mensaje del módulo inicial disparado por `show()` en index.html.
+        // La primera verbalización ahora es manejada exclusivamente por el evento.
 
         // Función para manejar el evento personalizado
         const handleSpeak = (event: CustomEvent<NicoleSpeakEventDetail>) => {
@@ -35,20 +37,23 @@ const NicoleVoiceEngine: React.FC = () => {
     }, []); // El array vacío asegura que el efecto se ejecute solo una vez
 
     return (
-        <div className="nicole">
-          <div className="nicole-head">
-            <div className="avatar" id="nicoleAvatar"></div>
+        <div className="avatar-box">
+          <div className="nicole-head flex items-center gap-3">
+            <div 
+              className="avatar w-14 h-14 rounded-lg bg-cover bg-center border-2 border-vino" 
+              id="nicoleAvatar"
+              style={{backgroundImage: "url('https://i.imgur.com/gfbI20A.jpeg')"}}
+            ></div>
             <div>
-              <div className="nicole-name">Nicole IA <span style={{color: 'var(--theme-accent-primary)'}}>Pro</span></div>
-              <div className="nicole-role">Asistente Corporativa · OmniCorp IA</div>
+              <div className="nicole-name text-lg font-bold">Nicole IA <span style={{color: 'var(--color-oro)'}}>Pro</span></div>
+              <div className="nicole-role text-xs" style={{color: 'var(--color-oro)'}}>Asistente Corporativa · OmniCorp IA</div>
             </div>
           </div>
-          <div className="bubble" id="nicoleSay">
+          <div className="quote-box mt-4 flex-grow" id="nicoleSay" style={{textAlign: 'left'}}>
             {message}
           </div>
-          <div className="footer">
-            <div className="font-semibold">Autoría: HecJT & Kalel</div>
-            <div>“Nosotros no creamos... transformamos.”</div>
+          <div className="footer-sello" style={{opacity: 1, color: 'var(--color-plata)'}}>
+             “Nosotros no creamos... transformamos.”
           </div>
         </div>
     );

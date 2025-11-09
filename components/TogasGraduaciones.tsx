@@ -5,7 +5,7 @@ import type { GraduationOptions } from '../services/geminiService';
 import ImageUploader from './ImageUploader';
 import { WandIcon, DownloadIcon, ResetIcon } from './Iconos';
 import { useBusy } from '../hooks/useBusy';
-import '../styles/NoirPremium.css';
+import '../styles/OmnicorpLegendaryTheme.css';
 
 
 type Step = 'atuendo' | 'ambiente' | 'ajustes';
@@ -36,7 +36,7 @@ const BACKGROUND_OPTIONS = [ { name: 'Auditorio Elegante', url: 'https://i.imgur
 const TogasGraduaciones: React.FC = () => {
   const [originalImage, setOriginalImage] = useState<ImageData | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [isLoading, runGenerate, error] = useBusy();
+  const { isBusy: isLoading, error, start, fail, done } = useBusy();
   const [activeStep, setActiveStep] = useState<Step>('atuendo');
 
   // State for options
@@ -54,13 +54,17 @@ const TogasGraduaciones: React.FC = () => {
     return () => wrapElement?.classList.remove('view-mode-full');
   }, []);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!originalImage) return;
-    runGenerate(async () => {
+    start();
+    try {
       const options: GraduationOptions = { togaColor, sashColor, sashStyle, background, customBackground, enhanceQuality };
       const result = await dressForGraduation(originalImage, options);
       if(result) setGeneratedImage(result);
-    });
+      done();
+    } catch(e: any) {
+        fail(e.message || 'Error al generar la foto de graduación.');
+    }
   };
 
   const handleDownload = () => {
@@ -91,7 +95,7 @@ const TogasGraduaciones: React.FC = () => {
   };
   
   const originalImageUrl = originalImage ? `data:${originalImage.mimeType};base64,${originalImage.base64}` : null;
-  const imageStyle = useMemo(() => ({
+  const imageFilterStyle = useMemo(() => ({
     filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%)`
   }), [filters]);
 
@@ -99,16 +103,16 @@ const TogasGraduaciones: React.FC = () => {
 
   return (
     <div className="graduation-root">
-      <div className="graduation-stage" style={generatedImage ? {} : imageStyle}>
+      <div className="graduation-stage" style={generatedImage ? {} : imageFilterStyle}>
         {!imageToDisplay ? (
           <ImageUploader onImageUpload={setOriginalImage} disabled={isLoading} />
         ) : (
-          <img src={imageToDisplay} alt="Graduado" />
+          <img src={imageToDisplay} alt="Graduado" style={{ imageRendering: 'crisp-edges' }} />
         )}
         {isLoading && <div className="loading-overlay"><div className="spinner"></div><p>Creando momento de graduación...</p></div>}
       </div>
 
-      <div className="graduation-controls">
+      <div className="avatar-box">
         <div className="controls-header">
             <TabButton isActive={activeStep === 'atuendo'} onClick={() => setActiveStep('atuendo')}>1. Atuendo</TabButton>
             <TabButton isActive={activeStep === 'ambiente'} onClick={() => setActiveStep('ambiente')}>2. Ambientación</TabButton>
@@ -127,8 +131,8 @@ const TogasGraduaciones: React.FC = () => {
                     <div>
                         <h4 className="panel-section-title">Estilo de Banda</h4>
                         <div className="flex gap-2 mb-3">
-                            <button className={`btn-toggle ${sashStyle === 'Tipo "V" (pechera de lujo)' ? 'active' : ''}`} onClick={() => setSashStyle('Tipo "V" (pechera de lujo)')}>Tipo "V"</button>
-                            <button className={`btn-toggle ${sashStyle === 'Tradicional (horizontal)' ? 'active' : ''}`} onClick={() => setSashStyle('Tradicional (horizontal)')}>Tradicional</button>
+                            <button className={`btn-legendary ${sashStyle === 'Tipo "V" (pechera de lujo)' ? 'active' : ''}`} onClick={() => setSashStyle('Tipo "V" (pechera de lujo)')}>Tipo "V"</button>
+                            <button className={`btn-legendary ${sashStyle === 'Tradicional (horizontal)' ? 'active' : ''}`} onClick={() => setSashStyle('Tradicional (horizontal)')}>Tradicional</button>
                         </div>
                         <div className="gallery-grid-5">
                             {SASH_OPTIONS.map(opt => <GalleryItem key={opt.name} label={opt.name} bg={opt.color} isSelected={sashColor === opt.name} onClick={() => setSashColor(opt.name)} />)}
@@ -156,9 +160,9 @@ const TogasGraduaciones: React.FC = () => {
         <div className="controls-footer">
             <div className="checkbox-control"><input type="checkbox" id="enhance-grad" checked={enhanceQuality} onChange={e => setEnhanceQuality(e.target.checked)} disabled={isLoading}/><label htmlFor="enhance-grad">Mejorar a Calidad Ultra (8K)</label></div>
             <div className="flex gap-4">
-                <button onClick={handleReset} disabled={isLoading} className="btn-noir-secondary"><ResetIcon/>Reiniciar</button>
-                <button onClick={handleGenerate} disabled={!originalImage || isLoading} className="btn-noir-primary flex-grow"><WandIcon/>Generar Foto</button>
-                <button onClick={handleDownload} disabled={!generatedImage || isLoading} className="btn-noir-secondary"><DownloadIcon/>Descargar</button>
+                <button onClick={handleReset} disabled={isLoading} className="btn-legendary"><ResetIcon/>Reiniciar</button>
+                <button onClick={handleGenerate} disabled={!originalImage || isLoading} className="btn-legendary flex-grow"><WandIcon/>Generar Foto</button>
+                <button onClick={handleDownload} disabled={!generatedImage || isLoading} className="btn-legendary"><DownloadIcon/>Descargar</button>
             </div>
              {error && <p className="text-red-400 text-sm text-center">{error}</p>}
         </div>

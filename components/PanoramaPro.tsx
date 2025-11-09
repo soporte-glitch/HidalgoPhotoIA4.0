@@ -1,185 +1,308 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import type { ImageData } from './types';
-import { stitchPanorama, removeBackground, replaceBackground, generateImageFromText, editImageWithPrompt, correctDictatedText } from '../services/geminiService';
-import { WandIcon, DownloadIcon, ResetIcon, MicIcon, MicOffIcon, FullscreenIcon, UploadIcon, BrightnessIcon, ContrastIcon, SaturationIcon } from './Iconos';
-import { useBusy } from '../hooks/useBusy';
-import ImageUploader from './ImageUploader';
-import '../styles/NoirPremium.css';
 
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean; interimResults: boolean; lang: string;
-  onend: (() => void) | null; onerror: ((event: any) => void) | null; onresult: ((event: any) => void) | null;
-  start: () => void; stop: () => void; abort: () => void;
-}
-declare global {
-  interface Window {
-    SpeechRecognition: { new (): SpeechRecognition };
-    webkitSpeechRecognition: { new (): SpeechRecognition };
-  }
-}
+import React, { useState, useCallback, useMemo } from 'react';
+import type { ImageData } from './types';
+import { stitchPanorama, removeBackground, replaceBackground } from '../services/geminiService';
+import { WandIcon, DownloadIcon, ResetIcon, UploadIcon } from './Iconos';
+import { useBusy } from '../hooks/useBusy';
+import '../styles/OmnicorpLegendaryTheme.css';
+
+// Helper to convert a remote image URL to base64 data.
+// This can fail due to CORS policy on the image server. Adding a comment about it.
+const urlToImageData = async (url: string, name: string): Promise<ImageData> => {
+    // Note: Fetching directly from URLs like imgur may be blocked by CORS policy.
+    // A CORS proxy might be needed for this to work reliably in a browser environment.
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Error al cargar la imagen del fondo: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const result = reader.result as string;
+            const base64 = result.split(',')[1];
+            if (base64) {
+                resolve({ base64, mimeType: blob.type, name });
+            } else {
+                reject(new Error("No se pudo leer el archivo de imagen de fondo."));
+            }
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(blob);
+    });
+};
+
+
+// Helper to convert a local file to ImageData, with resizing for performance.
+const fileToImageData = (file: File): Promise<ImageData | null> => {
+    return new Promise((resolve) => {
+        if (!file.type.startsWith('image/')) {
+            resolve(null);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                const MAX_DIMENSION = 1920;
+                let { width, height } = img;
+                if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                    if (width > height) {
+                        height = Math.round((height / width) * MAX_DIMENSION);
+                        width = MAX_DIMENSION;
+                    } else {
+                        width = Math.round((width / height) * MAX_DIMENSION);
+                        height = MAX_DIMENSION;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+                const quality = mimeType === 'image/jpeg' ? 0.92 : undefined;
+                const dataUrl = canvas.toDataURL(mimeType, quality);
+                const base64 = dataUrl.split(',')[1];
+
+                if (base64) {
+                    resolve({ base64, mimeType, name: file.name });
+                } else {
+                    console.warn(`No se pudo procesar el archivo: ${file.name}`);
+                    resolve(null);
+                }
+            };
+            img.src = e.target?.result as string;
+        };
+        reader.onerror = error => {
+            console.error(`Error al leer el archivo ${file.name}:`, error);
+            resolve(null);
+        };
+        reader.readAsDataURL(file);
+    });
+};
 
 const BACKGROUND_GALLERY = [
-    { name: 'Playa Tropical', url: 'https://i.imgur.com/example1.jpg', prompt: 'una playa tropical al atardecer con palmeras y agua cristalina, fotorrealista, 8k' },
-    { name: 'Ciudad Nocturna', url: 'https://i.imgur.com/example2.jpg', prompt: 'una ciudad futurista por la noche con rascacielos de neón y coches voladores, estilo cyberpunk, 8k' },
-    { name: 'Bosque Encantado', url: 'https://i.imgur.com/example3.jpg', prompt: 'un bosque encantado con árboles milenarios, rayos de luz solar atravesando el dosel y un arroyo brillante, fantasía, 8k' },
+    { name: 'Playa Tropical', url: 'https://i.imgur.com/kSIT2oW.jpeg' },
+    { name: 'Ciudad Nocturna', url: 'https://i.imgur.com/p1y7GkM.jpeg' },
+    { name: 'Bosque Encantado', url: 'https://i.imgur.com/66nI5I1.jpeg' },
 ];
+
+const MultiImageUploader: React.FC<{ onFilesUpload: (files: File[]) => void; disabled: boolean }> = ({ onFilesUpload, disabled }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const inputId = React.useId();
+
+  const handleFileChange = (files: FileList | null) => {
+    if (files) {
+      onFilesUpload(Array.from(files));
+    }
+  };
+
+  const onDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!disabled) setIsDragging(true);
+  }, [disabled]);
+
+  const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (!disabled) handleFileChange(e.dataTransfer.files);
+  }, [disabled, onFilesUpload]);
+
+  return (
+    <div
+      onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={onDragEnter} onDrop={onDrop}
+      className={`relative flex flex-col items-center justify-center w-full h-full min-h-48 border-2 border-dashed rounded-lg transition-colors duration-300 ${isDragging ? 'border-oro' : 'border-plata'} ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+    >
+      <input type="file" id={inputId} className="hidden" accept="image/*" multiple onChange={(e) => handleFileChange(e.target.files)} disabled={disabled} />
+      <label htmlFor={inputId} className={`flex flex-col items-center justify-center w-full h-full p-4 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+        <div className="w-12 h-12 text-oro"><UploadIcon /></div>
+        <p className="mt-2">Arrastra tus imágenes aquí</p>
+        <p className="text-sm">o haz clic para seleccionar</p>
+      </label>
+    </div>
+  );
+};
 
 const PanoramaPro: React.FC = () => {
     const [sourceImages, setSourceImages] = useState<ImageData[]>([]);
-    const [panoramaImage, setPanoramaImage] = useState<ImageData | null>(null);
-    const [finalImage, setFinalImage] = useState<string | null>(null);
-    const [isLoading, runTask, error] = useBusy();
+    const [stitchedImage, setStitchedImage] = useState<ImageData | null>(null);
+    const [editedImage, setEditedImage] = useState<string | null>(null);
+    const { isBusy: isLoading, error, runTask } = useBusy();
     const [prompt, setPrompt] = useState('');
-    const [isListening, setIsListening] = useState(false);
-    const recognitionRef = useRef<SpeechRecognition | null>(null);
-    const imageAreaRef = useRef<HTMLDivElement>(null);
-    const [backgroundUploaderVisible, setBackgroundUploaderVisible] = useState(false);
     const [galleryVisible, setGalleryVisible] = useState(false);
-    
-    const stage: 'upload' | 'stitched' | 'edited' = !panoramaImage ? 'upload' : (finalImage === `data:${panoramaImage.mimeType};base64,${panoramaImage.base64}` ? 'stitched' : 'edited');
 
-    useEffect(() => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'es-ES';
-            recognition.onresult = (event) => setPrompt(p => p + event.results[event.results.length - 1][0].transcript);
-            recognition.onend = () => setIsListening(false);
-            recognitionRef.current = recognition;
-        }
+    const stage = useMemo<'upload' | 'stitched' | 'edited'>(() => {
+        if (!stitchedImage) return 'upload';
+        const stitchedImageUrl = `data:${stitchedImage.mimeType};base64,${stitchedImage.base64}`;
+        if (!editedImage || editedImage === stitchedImageUrl) return 'stitched';
+        return 'edited';
+    }, [stitchedImage, editedImage]);
+
+    const handleReset = useCallback(() => {
+        setSourceImages([]);
+        setStitchedImage(null);
+        setEditedImage(null);
+        setPrompt('');
+        setGalleryVisible(false);
     }, []);
 
     const handleFilesUpload = useCallback((files: File[]) => {
         handleReset();
-        const imagePromises = files.filter(f => f.type.startsWith('image/')).map(file => 
-            new Promise<ImageData>(resolve => {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    const base64 = (e.target?.result as string).split(',')[1];
-                    resolve({ base64, mimeType: file.type, name: file.name });
-                };
-                reader.readAsDataURL(file);
-            })
-        );
-        Promise.all(imagePromises).then(setSourceImages);
-    }, []);
+        runTask(async () => {
+            const imagePromises = files.map(fileToImageData);
+            const results = await Promise.all(imagePromises);
+            const validImages = results.filter((img): img is ImageData => img !== null);
+            setSourceImages(validImages);
+        });
+    }, [handleReset, runTask]);
 
-    const handleStitch = async () => {
+    const handleStitch = useCallback(() => {
         if (sourceImages.length < 2) return;
         runTask(async () => {
-            // Fix: Provide missing arguments to stitchPanorama function call. Pass the existing 'prompt' state for user instructions and set 'enhanceQuality' to true as a default.
             const resultUrl = await stitchPanorama(sourceImages, prompt, true);
-            const blob = await fetch(resultUrl).then(r => r.blob());
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = () => {
-                const base64data = (reader.result as string).split(',')[1];
-                const stitchedImageData = { base64: base64data, mimeType: blob.type, name: `panorama.png` };
-                setPanoramaImage(stitchedImageData);
-                setFinalImage(`data:${stitchedImageData.mimeType};base64,${stitchedImageData.base64}`);
-            };
-        });
-    };
-
-    const handleRemoveBg = () => {
-        if (!panoramaImage) return;
-        runTask(async () => {
-            const result = await removeBackground(panoramaImage);
-            setFinalImage(result);
-        });
-    };
-    
-    const handleReplaceBg = (bgImage: ImageData) => {
-        if (!panoramaImage) return;
-        runTask(async () => {
-            const result = await replaceBackground(panoramaImage, bgImage);
-            setFinalImage(result);
-        });
-        setBackgroundUploaderVisible(false);
-        setGalleryVisible(false);
-    }
-    
-    const handleGenerateBgFromGallery = (bgPrompt: string) => {
-         if (!panoramaImage) return;
-         runTask(async () => {
-            const bgImageUrl = await generateImageFromText(bgPrompt);
-            const blob = await fetch(bgImageUrl).then(r => r.blob());
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = () => {
-                const base64data = (reader.result as string).split(',')[1];
-                const bgImageData = { base64: base64data, mimeType: blob.type, name: `bg.png` };
-                handleReplaceBg(bgImageData);
-            };
-         });
-    }
-
-    const handleReset = () => {
-        setSourceImages([]);
-        setPanoramaImage(null);
-        setFinalImage(null);
-        setPrompt('');
-    };
-
-    return (
-        <div className="panorama-v2-root">
-            <div ref={imageAreaRef} className="panorama-v2-stage">
-                {isLoading && <div className="loading-overlay"><div className="spinner"></div><p>Procesando con IA...</p></div>}
-                
-                {stage === 'upload' && sourceImages.length === 0 && (
-                    <div className="w-full h-full max-w-2xl">
-                        <ImageUploader onImageUpload={(img) => handleFilesUpload([new File([],img.name, {type: img.mimeType})])} disabled={isLoading} />
-                    </div>
-                )}
-                
-                {stage === 'upload' && sourceImages.length > 0 && (
-                     <div className="image-preview-grid">
-                        {sourceImages.map(img => <img key={img.name} src={`data:${img.mimeType};base64,${img.base64}`} alt={img.name} />)}
-                     </div>
-                )}
-                
-                {stage !== 'upload' && finalImage && (
-                    <div className="image-pan-container">
-                       <img src={finalImage} alt="Panorama" />
-                    </div>
-                )}
-            </div>
+            const mimeType = resultUrl.substring(resultUrl.indexOf(':') + 1, resultUrl.indexOf(';'));
+            const base64 = resultUrl.split(',')[1];
             
-            <div className="panorama-v2-controls-bottom">
-                {stage === 'upload' && (
-                    <div className="flex items-center justify-center gap-4">
-                        <button onClick={handleReset} disabled={isLoading || sourceImages.length === 0} className="btn-noir-secondary"><ResetIcon/>Limpiar</button>
-                        <button onClick={handleStitch} disabled={sourceImages.length < 2 || isLoading} className="btn-noir-primary"><WandIcon/>Unir Fotografías</button>
+            const newStitchedImage = { base64, mimeType, name: 'panorama_unido.png' };
+            setStitchedImage(newStitchedImage);
+            setEditedImage(resultUrl);
+        });
+    }, [sourceImages, prompt, runTask]);
+
+    const handleRemoveBg = useCallback(() => {
+        if (!stitchedImage) return;
+        runTask(async () => {
+            const result = await removeBackground(stitchedImage);
+            setEditedImage(result);
+        });
+    }, [stitchedImage, runTask]);
+
+    const handleReplaceBg = useCallback((bg: typeof BACKGROUND_GALLERY[0]) => {
+        if (!stitchedImage) return;
+        runTask(async () => {
+            const bgImageData = await urlToImageData(bg.url, bg.name);
+            const result = await replaceBackground(stitchedImage, bgImageData);
+            setEditedImage(result);
+        });
+    }, [stitchedImage, runTask]);
+
+    const handleDownload = useCallback(() => {
+        if (!editedImage) return;
+        const link = document.createElement('a');
+        link.href = editedImage;
+        link.download = `panorama_editado.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }, [editedImage]);
+
+    const renderWorkspace = () => {
+        if (isLoading) {
+             return (
+                <div className="loading-overlay">
+                    <div className="spinner"></div>
+                    <p>Procesando con IA...</p>
+                </div>
+             );
+        }
+        if (stage === 'upload') {
+            return sourceImages.length > 0
+                ? (
+                    <div className="flex flex-wrap gap-2 justify-center items-center p-4">
+                        {sourceImages.map((img, index) => (
+                            <img key={index} src={`data:${img.mimeType};base64,${img.base64}`} alt={`Fuente ${index + 1}`} className="max-h-24 rounded-md shadow-lg" />
+                        ))}
                     </div>
-                )}
-                
-                {stage !== 'upload' && (
-                    <div className="grid grid-cols-3 gap-4 items-start">
-                        <div className="flex flex-col gap-2">
-                           <h3 className="panel-section-title">Edición de Fondo</h3>
-                           <button onClick={handleRemoveBg} disabled={isLoading} className="btn-noir-secondary">Quitar Fondo</button>
-                           <button onClick={() => { setBackgroundUploaderVisible(true); setGalleryVisible(false); }} disabled={isLoading} className="btn-noir-secondary">Agregar Fondo</button>
-                           <button onClick={() => { setGalleryVisible(true); setBackgroundUploaderVisible(false); }} disabled={isLoading} className="btn-noir-secondary">Galería de Fondos 8K</button>
+                )
+                : <MultiImageUploader onFilesUpload={handleFilesUpload} disabled={isLoading} />;
+        }
+        if (editedImage) {
+            return <img src={editedImage} alt="Resultado Final" className="w-full h-full object-contain" />;
+        }
+        return null;
+    };
+    
+    return (
+        <div className="editor-root">
+            <div className="editor-workspace">
+                <div className="image-area relative">
+                    {renderWorkspace()}
+                </div>
+                <div className="tools-panel avatar-box">
+                    <div className="panel-header">
+                        <h2 className="header-logo" style={{textAlign: 'left', margin: 0, fontSize: '24px'}}>Panorama Pro IA</h2>
+                        <p>Une múltiples imágenes o edita una panorámica existente con IA.</p>
+                    </div>
+
+                    {stage === 'upload' && (
+                        <div className="panel-section">
+                            <label className="panel-section-title">Instrucciones de Unión (Opcional)</label>
+                            <textarea
+                                className="prompt-area"
+                                placeholder="Ej: 'une las fotos creando una vista de atardecer, ajusta los colores para que sean más cálidos'..."
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                disabled={isLoading}
+                            />
+                            <button
+                                onClick={handleStitch}
+                                disabled={sourceImages.length < 2 || isLoading}
+                                className="btn-legendary w-full mt-2"
+                            >
+                                <WandIcon /> Unir {sourceImages.length} Imágenes
+                            </button>
                         </div>
-                         
-                        <div className="flex flex-col gap-2">
-                            <h3 className="panel-section-title">Fondo Personalizado</h3>
-                            {backgroundUploaderVisible && <ImageUploader onImageUpload={handleReplaceBg} disabled={isLoading} compact/>}
+                    )}
+
+                    {stage !== 'upload' && (
+                        <div className="panel-section">
+                            <label className="panel-section-title">Edición Adicional</label>
+                            <div className="flex flex-col gap-2">
+                                <button onClick={handleRemoveBg} disabled={isLoading} className="btn-legendary">Quitar Fondo</button>
+                                <button onClick={() => setGalleryVisible(!galleryVisible)} disabled={isLoading} className="btn-legendary">Reemplazar Fondo</button>
+                            </div>
                             {galleryVisible && (
-                                <div className="flex flex-col gap-2">
-                                {BACKGROUND_GALLERY.map(bg => (
-                                    <button key={bg.name} onClick={() => handleGenerateBgFromGallery(bg.prompt)} className="btn-noir-secondary text-sm">{bg.name}</button>
-                                ))}
+                                <div className="grid grid-cols-3 gap-2 mt-3">
+                                    {BACKGROUND_GALLERY.map(bg => (
+                                        <div key={bg.name} className="cursor-pointer group" onClick={() => handleReplaceBg(bg)}>
+                                            <img
+                                                src={bg.url}
+                                                alt={bg.name}
+                                                className="w-full h-16 object-cover rounded border-2 border-transparent group-hover:border-oro transition-all"
+                                            />
+                                            <p className="text-xs text-center mt-1">{bg.name}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
-
-                        <div className="flex flex-col gap-2 text-right">
-                             <button onClick={handleReset} disabled={isLoading} className="btn-noir-secondary self-end w-auto px-4"><ResetIcon/>Reiniciar</button>
-                             <a href={finalImage!} download="panorama_editado.png" className="btn-noir-primary mt-auto"><DownloadIcon/>Descargar</a>
-                        </div>
+                    )}
+                    
+                    {error && <p className="text-red-400 text-sm text-center mt-2">{error}</p>}
+                    
+                    <div className="panel-footer button-group">
+                        <button onClick={handleReset} disabled={isLoading} className="btn-legendary">
+                            <ResetIcon /> Reiniciar
+                        </button>
+                        <button
+                            onClick={handleDownload}
+                            disabled={!editedImage || isLoading}
+                            className="btn-legendary"
+                        >
+                            <DownloadIcon /> Descargar
+                        </button>
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );

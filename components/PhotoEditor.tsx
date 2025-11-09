@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback } from 'react';
 import type { ImageData } from './types';
 import { editImageWithPrompt } from '../services/geminiService';
@@ -11,7 +12,8 @@ const PhotoEditor: React.FC = () => {
   const [originalImage, setOriginalImage] = useState<ImageData | null>(null);
   const [editedImage, setEditedImage] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
-  const [isLoading, runTask, error] = useBusy();
+  // Fix: Destructured `useBusy` as an object instead of an array to resolve iterator error.
+  const { isBusy: isLoading, runTask, error } = useBusy();
 
   const handleImageUpload = useCallback((imageData: ImageData) => {
     setOriginalImage(imageData);

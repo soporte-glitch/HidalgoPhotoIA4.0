@@ -14,7 +14,8 @@ const RestauracionIA: React.FC = () => {
   const [enhanceQuality, setEnhanceQuality] = useState<boolean>(true);
   const [focusOnFaces, setFocusOnFaces] = useState<boolean>(true);
   const [addWatermark, setAddWatermark] = useState<boolean>(true);
-  const [isLoading, runRestore, error] = useBusy();
+  // Fix: Destructured `useBusy` as an object instead of an array to resolve iterator error.
+  const { isBusy: isLoading, runTask: runRestore, error } = useBusy();
 
   const handleImageUpload = useCallback((imageData: ImageData) => {
     setOriginalImage(imageData);

@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import type { ImageData } from './types';
 import { useBusy } from '../hooks/useBusy';
@@ -44,13 +45,13 @@ const MultiImageUploader: React.FC<{ onFilesUpload: (files: File[]) => void; dis
   return (
     <div
       onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={onDragEnter} onDrop={onDrop}
-      className={`relative flex flex-col items-center justify-center w-full h-full min-h-48 border-2 border-dashed rounded-lg transition-colors duration-300 ${isDragging ? 'border-brand-neon bg-panel' : 'border-white/20 bg-black/20'} ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+      className={`relative flex flex-col items-center justify-center w-full h-full min-h-48 border-2 border-dashed rounded-lg transition-colors duration-300 ${isDragging ? 'border-oro' : 'border-plata'} ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
     >
       <input type="file" id={inputId} className="hidden" accept="image/*" multiple onChange={(e) => handleFileChange(e.target.files)} disabled={disabled} />
       <label htmlFor={inputId} className={`flex flex-col items-center justify-center w-full h-full p-4 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-        <div className="w-12 h-12 text-brand-neon"><UploadIcon /></div>
-        <p className="mt-2 text-white/80">Arrastra tus imágenes aquí</p>
-        <p className="text-sm text-white/50">o haz clic para seleccionar</p>
+        <div className="w-12 h-12 text-oro"><UploadIcon /></div>
+        <p className="mt-2">Arrastra tus imágenes aquí</p>
+        <p className="text-sm">o haz clic para seleccionar</p>
       </label>
     </div>
   );
@@ -62,7 +63,7 @@ const EdicionLotes: React.FC = () => {
     const [images, setImages] = useState<BatchImage[]>([]);
     const [prompt, setPrompt] = useState('');
     const [prefix, setPrefix] = useState('OmniPhoto-');
-    const [isLoading, runTask, error] = useBusy();
+    const { isBusy: isLoading, error, start, fail, done } = useBusy();
     const [progress, setProgress] = useState(0);
 
     const handleFilesUpload = useCallback((files: File[]) => {
@@ -111,10 +112,11 @@ const EdicionLotes: React.FC = () => {
       });
     }, []);
 
-    const handleProcessBatch = () => {
+    const handleProcessBatch = async () => {
         if (!prompt || images.length === 0) return;
-
-        runTask(async () => {
+        start();
+        
+        try {
             let processedCount = 0;
             setProgress(0);
             setImages(currentImages => currentImages.map(img => ({...img, status: 'pendiente', processedUrl: null, error: undefined})));
@@ -133,7 +135,10 @@ const EdicionLotes: React.FC = () => {
                 processedCount++;
                 setProgress((processedCount / imagesToProcess.length) * 100);
             }
-        });
+            done();
+        } catch (e: any) {
+            fail("Ocurrió un error general durante el procesamiento por lotes.");
+        }
     };
 
     const handleDownloadAll = () => {
@@ -164,29 +169,29 @@ const EdicionLotes: React.FC = () => {
     return (
         <div className="h-full flex flex-col lg:flex-row gap-6 p-2">
             <div className="w-full lg:w-96 flex-shrink-0">
-                <div className="bg-panel p-4 rounded-xl shadow-neon-gold border border-white/10 flex flex-col h-full">
-                    <h2 className="text-xl font-bold text-white mb-4 text-hover" style={{ fontFamily: "'Cinzel Decorative', serif" }}>Edición por Lotes IA</h2>
+                <div className="avatar-box flex flex-col h-full">
+                    <h2 className="text-xl font-bold mb-4 header-logo" style={{textAlign: 'left', margin: 0}}>Edición por Lotes IA</h2>
                     <div className="mb-4">
                         <MultiImageUploader onFilesUpload={handleFilesUpload} disabled={isLoading} />
                     </div>
                     <div>
-                        <label htmlFor="batch-prompt" className="block text-sm font-medium text-white/80 mb-2">Comando IA para aplicar en masa</label>
+                        <label htmlFor="batch-prompt" className="panel-section-title">Comando IA para aplicar en masa</label>
                         <textarea
                             id="batch-prompt"
                             rows={4}
-                            className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white focus:ring-2 focus:ring-brand-neon transition"
+                            className="prompt-area"
                             placeholder="Ej: 'mejora la luz y el contraste', 'aplica un filtro blanco y negro dramático'..."
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             disabled={isLoading}
                         />
                     </div>
-                    <div className="mt-auto pt-4 border-t border-white/10 space-y-3">
+                    <div className="mt-auto pt-4 border-t border-plata space-y-3">
                          <div className="w-full bg-black/20 rounded-full h-2.5">
-                            <div className="bg-brand-neon-pink h-2.5 rounded-full" style={{ width: `${progress}%`, transition: 'width 0.5s ease' }}></div>
+                            <div className="bg-oro h-2.5 rounded-full" style={{ width: `${progress}%`, transition: 'width 0.5s ease' }}></div>
                         </div>
-                        <button onClick={handleProcessBatch} disabled={images.length === 0 || !prompt || isLoading} className="w-full flex items-center justify-center bg-gradient-to-r from-brand-neon-pink to-brand-neon text-black font-bold py-3 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:enabled:scale-105">
-                            <WandIcon /> <span className="ml-2">{isLoading ? `Procesando... (${Math.round(progress)}%)` : `Procesar ${images.length} Imágenes`}</span>
+                        <button onClick={handleProcessBatch} disabled={images.length === 0 || !prompt || isLoading} className="btn-legendary w-full">
+                            <WandIcon /> <span>{isLoading ? `Procesando... (${Math.round(progress)}%)` : `Procesar ${images.length} Imágenes`}</span>
                         </button>
                         <div className="flex gap-2">
                             <input 
@@ -195,12 +200,13 @@ const EdicionLotes: React.FC = () => {
                                 onChange={e => setPrefix(e.target.value)} 
                                 placeholder="Prefijo..." 
                                 disabled={isLoading}
-                                className="flex-grow bg-black/20 border border-white/10 rounded-lg px-3 text-white text-sm focus:ring-2 focus:ring-brand-neon transition"
+                                className="prompt-area flex-grow"
+                                style={{minHeight: 'auto', padding: '10px'}}
                             />
-                            <button onClick={handleDownloadAll} disabled={isLoading || completedCount === 0} className="flex items-center justify-center gap-2 bg-white/10 text-white/80 font-semibold py-2 px-4 rounded-lg hover:bg-white/20 transition-colors disabled:opacity-50">
+                            <button onClick={handleDownloadAll} disabled={isLoading || completedCount === 0} className="btn-legendary">
                                 <DownloadIcon /> <span>Descargar</span>
                             </button>
-                            <button onClick={handleReset} disabled={isLoading} className="flex items-center justify-center p-2 bg-white/10 text-white/80 font-semibold rounded-lg hover:bg-white/20 transition-colors disabled:opacity-50">
+                            <button onClick={handleReset} disabled={isLoading} className="btn-legendary">
                                 <ResetIcon />
                             </button>
                         </div>
@@ -221,7 +227,7 @@ const EdicionLotes: React.FC = () => {
                             <div className="aspect-square relative flex items-center justify-center">
                                 {img.status === 'completado' && <img src={img.processedUrl!} alt="Procesada" className="w-full h-full object-contain rounded" />}
                                 {img.status !== 'completado' && <img src={`data:${img.original.mimeType};base64,${img.original.base64}`} alt="Original" className={`w-full h-full object-contain rounded ${img.status === 'procesando' ? 'opacity-30' : ''}`} />}
-                                {img.status === 'procesando' && <div className="absolute w-8 h-8 border-2 border-dashed rounded-full animate-spin border-brand-neon"></div>}
+                                {img.status === 'procesando' && <div className="absolute w-8 h-8 border-2 border-dashed rounded-full animate-spin border-oro"></div>}
                             </div>
                             <div className="text-xs text-white/70 truncate mt-2" title={img.original.name}>{img.original.name}</div>
                             <div className="flex items-center justify-between mt-1">

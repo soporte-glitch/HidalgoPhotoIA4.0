@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { generateImageFromText } from '../services/geminiService';
 import { WandIcon, DownloadIcon } from './Iconos';
@@ -44,7 +45,7 @@ const ImageGenerator: React.FC = () => {
                     </div>
                 )}
                 {!isLoading && generatedImage && (
-                    <img src={generatedImage} alt="Generated" className="max-w-full max-h-full object-contain rounded-lg" />
+                    <img src={generatedImage} alt="Generated" className="max-w-full max-h-full object-contain rounded-lg" loading="lazy" />
                 )}
                 {!isLoading && !generatedImage && (
                      <div className="text-center text-brand-text-secondary">

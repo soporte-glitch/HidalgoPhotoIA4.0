@@ -57,12 +57,12 @@ const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({ beforeImage, afte
       onMouseDown={handleMouseDown}
       onTouchStart={handleMouseDown}
     >
-      <img src={beforeImage} alt="Original" className="absolute top-0 left-0 w-full h-full object-contain" draggable="false" />
+      <img src={beforeImage} alt="Original" className="absolute top-0 left-0 w-full h-full object-contain" style={{ imageRendering: 'crisp-edges' }} draggable="false" />
       <div
         className="absolute top-0 left-0 w-full h-full overflow-hidden"
         style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
       >
-        <img src={afterImage} alt="Editada" className="absolute top-0 left-0 w-full h-full object-contain" draggable="false" />
+        <img src={afterImage} alt="Editada" className="absolute top-0 left-0 w-full h-full object-contain" style={{ imageRendering: 'crisp-edges' }} draggable="false" />
       </div>
       <div
         className="absolute top-0 h-full w-1 bg-brand-accent"

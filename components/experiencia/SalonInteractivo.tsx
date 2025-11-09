@@ -52,7 +52,7 @@ const SalonInteractivo: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const [draggingItem, setDraggingItem] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
-  const [isLoading, runGenerate, error, clearError] = useBusy();
+  const { isBusy: isLoading, error, start, fail, done, clearError } = useBusy();
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -88,17 +88,22 @@ const SalonInteractivo: React.FC = () => {
       }
   };
   
-  const handleCorrectText = () => {
+  const handleCorrectText = async () => {
       if (!layoutPrompt) return;
-      runGenerate(async () => {
+      start();
+      try {
           const corrected = await correctDictatedText(layoutPrompt);
           if (corrected) setLayoutPrompt(corrected);
-      });
+          done();
+      } catch (e: any) {
+          fail(e.message || 'Error al corregir texto.');
+      }
   };
 
-  const handleGenerateLayout = () => {
+  const handleGenerateLayout = async () => {
       clearError();
-      runGenerate(async () => {
+      start();
+      try {
           let result;
           if (realVenueImage) {
               result = await generateLayoutFromImageAndPrompt(realVenueImage, layoutPrompt, venueDimensions, salonSize.width, salonSize.height);
@@ -108,29 +113,40 @@ const SalonInteractivo: React.FC = () => {
           if (result) {
               setItems(result);
           }
-      });
+          done();
+      } catch (e: any) {
+          fail(e.message || 'Error al generar el plano.');
+      }
   };
 
-  const handleGenerateAmbience = () => {
+  const handleGenerateAmbience = async () => {
       clearError();
-      runGenerate(async () => {
+      start();
+      try {
           const result = await generateImageFromText(`Crea un fondo de un salón de eventos con la siguiente temática: ${ambiencePrompt}. La imagen debe ser una vista superior (cenital) y atmosférica, adecuada como fondo para un plano de distribución.`);
           if (result) {
               setAmbienceUrl(result);
               setRealVenueImage(null); // Desactiva la imagen real si se genera un ambiente
           }
-      });
+          done();
+      } catch (e: any) {
+          fail(e.message || 'Error al generar ambiente.');
+      }
   }
 
-  const handleGenerateRealisticView = () => {
+  const handleGenerateRealisticView = async () => {
     if (!realVenueImage || items.length === 0) return;
     clearError();
-    runGenerate(async () => {
+    start();
+    try {
         const result = await generateRealisticVenueView(realVenueImage, items, ambiencePrompt);
         if (result) {
             setRealisticPreviewUrl(result);
         }
-    });
+        done();
+    } catch(e: any) {
+        fail(e.message || 'Error al renderizar la vista.');
+    }
   };
 
   const draw = useCallback(() => {

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { ImageData } from '../types';
 import { createVirtualBride } from '../../services/geminiService';
@@ -69,14 +70,15 @@ const NoviaVirtual: React.FC = () => {
 
     const [enhanceQuality, setEnhanceQuality] = useState(true);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const [isLoading, runGenerate, error] = useBusy();
+    const { isBusy: isLoading, error, start, fail, done } = useBusy();
     const [activeStep, setActiveStep] = useState<Step>('vestido');
     const [filters, setFilters] = useState({ brightness: 100, contrast: 100, saturate: 100 });
 
-    const handleGenerate = () => {
+    const handleGenerate = async () => {
         if (!modelImage) return;
         setGeneratedImage(null);
-        runGenerate(async () => {
+        start();
+        try {
             const result = await createVirtualBride({
                 model: modelImage,
                 dress: dressImage,
@@ -87,7 +89,10 @@ const NoviaVirtual: React.FC = () => {
             if (result) {
                 setGeneratedImage(result);
             }
-        });
+            done();
+        } catch(e: any) {
+            fail(e.message || 'Error al crear el look virtual.');
+        }
     };
 
     const handleDownload = () => {
@@ -164,14 +169,15 @@ const NoviaVirtual: React.FC = () => {
     }
 
     const imageStyle = useMemo(() => ({
-        filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%)`
+        filter: `brightness(${filters.brightness}%) contrast(${filters.contrast}%) saturate(${filters.saturate}%)`,
+        imageRendering: 'crisp-edges' as const,
     }), [filters]);
 
     return (
         <div className="h-full flex flex-col-reverse lg:flex-row gap-6 p-2">
             <div className="w-full lg:w-[450px] flex-shrink-0">
-                <div className="bg-panel p-4 rounded-xl shadow-neon-gold border border-white/10 flex flex-col h-full">
-                    <h2 className="text-xl font-bold text-white mb-2 text-hover" style={{ fontFamily: "'Cinzel Decorative', serif" }}>Estudio Novia Virtual</h2>
+                <div className="avatar-box flex flex-col h-full">
+                    <h2 className="header-logo" style={{textAlign: 'left', margin: '0 0 10px 0', fontSize: '22px'}}>Estudio Novia Virtual</h2>
                     
                     <div className="mb-4">
                         <label className="panel-section-title">1. Rostro y Complexión Base</label>
@@ -227,16 +233,16 @@ const NoviaVirtual: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="mt-auto space-y-3 pt-4 border-t border-white/10">
+                    <div className="mt-auto space-y-3 pt-4 border-t border-plata">
                          <div className="checkbox-control"><input type="checkbox" id="enhance-novia" checked={enhanceQuality} onChange={e => setEnhanceQuality(e.target.checked)} /><label htmlFor="enhance-novia">Calidad Ultra (8K)</label></div>
-                        <button onClick={handleGenerate} disabled={!modelImage || isLoading} className="w-full flex items-center justify-center bg-gradient-to-r from-[var(--brand-neon-pink)] to-[var(--brand-neon)] text-black font-bold py-3 px-4 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:enabled:scale-105">
+                        <button onClick={handleGenerate} disabled={!modelImage || isLoading} className="btn-legendary w-full">
                             <WandIcon />
                             <span className="ml-2">{isLoading ? 'Creando Magia...' : 'Crear Novia Virtual'}</span>
                         </button>
                         <div className="flex space-x-3">
-                             <button onClick={handleReset} disabled={isLoading} className="btn-noir-secondary"><ResetIcon /><span>Limpiar</span></button>
-                             <button onClick={handlePrint} disabled={!generatedImage || isLoading} className="btn-noir-secondary"><span>Imprimir</span></button>
-                            <button onClick={handleDownload} disabled={!generatedImage || isLoading} className="btn-noir-secondary"><DownloadIcon /><span>Descargar</span></button>
+                             <button onClick={handleReset} disabled={isLoading} className="btn-legendary"><ResetIcon /><span>Limpiar</span></button>
+                             <button onClick={handlePrint} disabled={!generatedImage || isLoading} className="btn-legendary"><span>Imprimir</span></button>
+                            <button onClick={handleDownload} disabled={!generatedImage || isLoading} className="btn-legendary"><DownloadIcon /><span>Descargar</span></button>
                         </div>
                     </div>
                 </div>
@@ -245,8 +251,8 @@ const NoviaVirtual: React.FC = () => {
             <div className="flex-1 flex flex-col items-center justify-center bg-black/20 rounded-xl p-4 border border-white/10">
                 {isLoading && (
                     <div className="flex flex-col items-center justify-center text-center">
-                        <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-[var(--brand-neon)]"></div>
-                        <p className="text-white/70 mt-4">Generando el retrato, por favor espera...</p>
+                        <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-oro"></div>
+                        <p className="mt-4">Generando el retrato, por favor espera...</p>
                     </div>
                 )}
                 {!isLoading && error && (

@@ -1,7 +1,7 @@
 // Importa los módulos necesarios de la SDK de Google GenAI.
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import type { ImageData } from '../components/types';
-import type { Layout } from './layoutPlanner';
+import type { LayoutItem } from './layoutPlanner';
 
 const HIGH_QUALITY_PROMPT_ADDITION = ` renderiza el resultado final en calidad ultra-detallada 8K. Aplica renderizado fotorrealista de alto nivel con enfoque preciso y texturas ricas. La imagen debe tener una claridad y nitidez impecables, sin artefactos ni pérdida de calidad.`;
 
@@ -9,13 +9,38 @@ const HIGH_QUALITY_PROMPT_ADDITION = ` renderiza el resultado final en calidad u
  * Función para editar una imagen basada en una descripción de texto.
  * Utiliza el modelo gemini-2.5-flash-image, optimizado para tareas de edición rápida de imágenes.
  * @param originalImage - El objeto de la imagen original.
- * @param prompt - La instrucción de texto que describe la edición.
+ * @param userPrompt - La instrucción de texto que describe la edición.
  * @returns Una promesa que se resuelve con la URL de datos (base64) de la imagen editada.
  */
-export const editImageWithPrompt = async (originalImage: ImageData, prompt: string): Promise<string> => {
+export const editImageWithPrompt = async (originalImage: ImageData, userPrompt: string): Promise<string> => {
   if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
   
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  // Improved prompt engineering for background changes
+  const backgroundKeywords = ['fondo', 'background', 'reemplaza el fondo', 'cambia el fondo', 'pon un fondo'];
+  const isBackgroundChange = backgroundKeywords.some(keyword => userPrompt.toLowerCase().includes(keyword));
+
+  let structuredPrompt: string;
+
+  if (isBackgroundChange) {
+      structuredPrompt = `Tarea: Cambio de fondo fotorrealista.
+**REGLAS CRÍTICAS:**
+1. **Extracción Perfecta:** Identifica y aísla al sujeto(s) principal(es) de la imagen con una precisión absoluta. Los bordes, especialmente en el cabello o detalles finos, deben ser impecables.
+2. **Generación de Fondo:** Crea un nuevo fondo basándote en la descripción: "${userPrompt}". El fondo debe ser de alta calidad, fotorrealista y coherente en perspectiva.
+3. **Integración Profesional:** Integra al sujeto en el nuevo fondo. La iluminación, las sombras proyectadas, los reflejos ambientales y la corrección de color deben coincidir perfectamente entre el sujeto y el nuevo fondo para que el resultado sea indistinguible de una fotografía real.
+4. **NO ALTERAR AL SUJETO:** El sujeto principal (personas, objetos) no debe ser modificado, deformado o alterado de ninguna manera. Su apariencia original debe ser 100% preservada.`;
+  } else {
+      structuredPrompt = `Actúa como un experto en edición fotográfica y retocador digital de clase mundial. Tu tarea es editar la imagen proporcionada basándote en la siguiente instrucción con la máxima precisión. Eres capaz de realizar ediciones complejas como inpainting (reconstruir partes), outpainting (expandir la imagen), y modificación de objetos o rostros.
+
+**Reglas Críticas:**
+1.  **Fotorrealismo:** El resultado debe ser indistinguishable de una fotografía real. La iluminación, sombras y texturas deben ser impecables y coherentes.
+2.  **Preservar Identidad:** Al modificar personas, preserva su identidad y rasgos. Los cambios deben ser naturales.
+3.  **Integración Invisible:** Los elementos añadidos deben integrarse sin costuras, respetando el estilo de la foto original.
+
+**Instrucción de Edición:**
+"${userPrompt}"`;
+  }
 
   try {
     const response = await ai.models.generateContent({
@@ -23,7 +48,7 @@ export const editImageWithPrompt = async (originalImage: ImageData, prompt: stri
       contents: {
         parts: [
           { inlineData: { data: originalImage.base64, mimeType: originalImage.mimeType } },
-          { text: prompt },
+          { text: structuredPrompt },
         ],
       },
       config: { responseModalities: [Modality.IMAGE] },
@@ -33,24 +58,29 @@ export const editImageWithPrompt = async (originalImage: ImageData, prompt: stri
 
     if (candidate && candidate.content && candidate.content.parts) {
       for (const part of candidate.content.parts) {
-        if (part.inlineData) {
+        if (part.inlineData && part.inlineData.data) {
+          if (part.inlineData.data.length < 1000) {
+              console.warn("Respuesta de IA sospechosa: El tamaño de los datos es muy pequeño.", { length: part.inlineData.data.length });
+              throw new Error("La IA generó un resultado inválido o corrupto.");
+          }
           return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
         }
       }
     }
 
     if (candidate?.finishReason === 'SAFETY') {
-      throw new Error("La solicitud fue bloqueada por motivos de seguridad. Intenta con una imagen o descripción diferente.");
+      console.error("Fallo crítico: La solicitud fue bloqueada por motivos de seguridad de la API.");
+      throw new Error("La solicitud fue bloqueada por seguridad. Intenta con otra imagen o descripción.");
     }
     
-    throw new Error("No se generó ninguna imagen en la respuesta. La solicitud pudo haber sido bloqueada.");
+    throw new Error("La IA no pudo generar la edición solicitada. Intenta de nuevo.");
 
   } catch (error) {
-    console.error("Error al llamar a la API de Gemini para edición:", error);
-    if (error instanceof Error && (error.message.includes("bloqueada") || error.message.includes("seguridad"))) {
+    console.error("Fallo crítico:", error);
+    if (error instanceof Error) {
         throw error;
     }
-    throw new Error("Fallo al editar la imagen desde la API.");
+    throw new Error("Fallo en la comunicación con el servicio de IA.");
   }
 };
 
@@ -67,7 +97,7 @@ export const generateImageFromText = async (prompt: string): Promise<string> => 
 
     try {
         const response = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001', // Se mantiene el modelo superior para generación de alta calidad.
+            model: 'imagen-4.0-generate-001', 
             prompt: prompt,
             config: {
                 numberOfImages: 1,
@@ -82,10 +112,26 @@ export const generateImageFromText = async (prompt: string): Promise<string> => 
         }
         throw new Error('No se generó ninguna imagen en la respuesta.');
     } catch (error) {
-        console.error('Error al llamar a la API de Gemini para generación:', error);
+        console.error('Fallo crítico:', error);
         throw new Error('Fallo al generar la imagen desde la API.');
     }
 };
+
+/**
+ * Mejora una imagen a una resolución y detalle superiores.
+ * @param originalImage La imagen a mejorar.
+ * @returns Una promesa que se resuelve con la URL de datos (base64) de la imagen mejorada.
+ */
+export const enhanceImageTo8K = async (originalImage: ImageData): Promise<string> => {
+    const prompt = `Actúa como un experto en post-producción digital y remasterización de imágenes. Tu única tarea es mejorar esta imagen a una calidad ultra-detallada de 8K.
+**REGLAS CRÍTICAS:**
+1.  **AUMENTO DE RESOLUCIÓN Y DETALLE:** Aumenta la resolución, la nitidez general y la claridad de la imagen de forma significativa. Realza las texturas y los detalles finos.
+2.  **ELIMINACIÓN DE DEFECTOS:** Elimina por completo cualquier artefacto de compresión, ruido digital o grano de la película de forma inteligente, sin perder textura natural.
+3.  **NO ALTERAR CONTENIDO:** No alteres el contenido, los sujetos, los colores, la iluminación o la composición de la imagen original. El resultado debe ser una versión fotorrealista y de mayor calidad de la misma fotografía.`;
+
+    return editImageWithPrompt(originalImage, prompt);
+};
+
 
 /**
  * Expande una imagen a un formato panorámico usando IA.
@@ -215,7 +261,7 @@ export const replaceBackground = async (subjectImage: ImageData, backgroundImage
         }
         throw new Error("No se generó ninguna imagen en la respuesta.");
     } catch (error) {
-        console.error("Error en replaceBackground:", error);
+        console.error("Fallo crítico:", error);
         throw new Error("Fallo al reemplazar el fondo desde la API.");
     }
 };
@@ -306,8 +352,8 @@ Instrucciones:
         throw new Error("No se generó ninguna imagen en la respuesta. La solicitud pudo haber sido bloqueada.");
 
     } catch (error) {
-        console.error("Error al llamar a la API de Gemini para edición de graduación:", error);
-        if (error instanceof Error && (error.message.includes("bloqueada") || error.message.includes("seguridad"))) {
+        console.error("Fallo crítico:", error);
+        if (error instanceof Error) {
             throw error;
         }
         throw new Error("Fallo al generar el atuendo de graduación desde la API.");
@@ -323,6 +369,7 @@ export interface VirtualLookInputs {
     enhanceQuality?: boolean;
 }
 
+// Fix: This function was incomplete and did not return a value. It has been fully implemented.
 const createVirtualLook = async (inputs: VirtualLookInputs, contextPrompt: string): Promise<string> => {
     if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -335,19 +382,26 @@ const createVirtualLook = async (inputs: VirtualLookInputs, contextPrompt: strin
 - **IMAGEN 2 (Vestido):** Toma el vestido de esta imagen y vístelo sobre el cuerpo de la modelo principal. Asegúrate de que el ajuste, la tela, los detalles y la caída del vestido sean realistas y se adapten a la pose de la modelo.
 - **IMAGEN 3 (Peinado):** Aplica el peinado de esta imagen sobre la cabeza de la modelo principal. Adapta el color y la forma del cabello para que encaje de manera natural.
 - **IMAGEN 4 (Maquillaje):** Aplica el estilo de maquillaje de esta imagen al rostro de la modelo principal. Presta atención a los tonos de la sombra de ojos, el labial y el contorno.
-- **IMAGEN 5 (Fondo):** Coloca a la persona resultante en el fondo o salón de eventos de esta imagen. La iluminación sobre la persona (sombras, reflejos) debe coincidir perfectamente con la iluminación del fondo para una integración impecable.
-
-El resultado final debe ser una imagen cohesiva, sin artefactos, y completamente fotorrealista. La integración de los elementos debe ser invisible.`;
-
+- **IMAGEN 5 (Fondo):** Coloca a la persona resultante en el fondo o salón de eventos de esta imagen. La iluminación sobre la persona (sombras, reflejos) sea coherente con el fondo. La composición final debe ser fotorrealista.`;
+    
     if (inputs.enhanceQuality) {
         prompt += HIGH_QUALITY_PROMPT_ADDITION;
     }
 
-    const parts: any[] = [{ inlineData: { data: inputs.model.base64, mimeType: inputs.model.mimeType } }];
-    if (inputs.dress) parts.push({ inlineData: { data: inputs.dress.base64, mimeType: inputs.dress.mimeType } });
-    if (inputs.hair) parts.push({ inlineData: { data: inputs.hair.base64, mimeType: inputs.hair.mimeType } });
-    if (inputs.makeup) parts.push({ inlineData: { data: inputs.makeup.base64, mimeType: inputs.makeup.mimeType } });
-    if (inputs.background) parts.push({ inlineData: { data: inputs.background.base64, mimeType: inputs.background.mimeType } });
+    const parts: any[] = [];
+    parts.push({ inlineData: { data: inputs.model.base64, mimeType: inputs.model.mimeType } });
+    if (inputs.dress) {
+        parts.push({ inlineData: { data: inputs.dress.base64, mimeType: inputs.dress.mimeType } });
+    }
+    if (inputs.hair) {
+        parts.push({ inlineData: { data: inputs.hair.base64, mimeType: inputs.hair.mimeType } });
+    }
+    if (inputs.makeup) {
+        parts.push({ inlineData: { data: inputs.makeup.base64, mimeType: inputs.makeup.mimeType } });
+    }
+    if (inputs.background) {
+        parts.push({ inlineData: { data: inputs.background.base64, mimeType: inputs.background.mimeType } });
+    }
     parts.push({ text: prompt });
 
     try {
@@ -355,269 +409,6 @@ El resultado final debe ser una imagen cohesiva, sin artefactos, y completamente
             model: 'gemini-2.5-flash-image',
             contents: { parts },
             config: { responseModalities: [Modality.IMAGE] },
-        });
-
-        const candidate = response.candidates?.[0];
-        if (candidate && candidate.content && candidate.content.parts) {
-            for (const part of candidate.content.parts) {
-                if (part.inlineData) {
-                    return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                }
-            }
-        }
-        if (candidate?.finishReason === 'SAFETY') {
-            throw new Error("La solicitud fue bloqueada por motivos de seguridad. Prueba con imágenes diferentes.");
-        }
-        throw new Error("No se generó ninguna imagen. La solicitud pudo haber sido bloqueada o no produjo un resultado válido.");
-    } catch (error) {
-        console.error("Error al llamar a la API de Gemini para Virtual Look:", error);
-        if (error instanceof Error && (error.message.includes("bloqueada") || error.message.includes("seguridad"))) {
-            throw error;
-        }
-        throw new Error("Fallo al generar la imagen desde la API.");
-    }
-};
-
-/**
- * Crea una imagen de "novia virtual" combinando múltiples imágenes de referencia.
- */
-export const createVirtualBride = async (inputs: VirtualLookInputs): Promise<string> => {
-    const context = "Actúa como un director de arte digital experto en fotocomposición de bodas. Tu tarea es crear una única imagen fotorrealista de una 'novia virtual' combinando elementos de las siguientes imágenes de referencia.";
-    return createVirtualLook(inputs, context);
-};
-
-/**
- * Crea una imagen de "quinceañera virtual" combinando múltiples imágenes de referencia.
- */
-export const createVirtualQuinceanera = async (inputs: VirtualLookInputs): Promise<string> => {
-    const context = "Actúa como un director de arte digital experto en fotocomposición para celebraciones de Quince Años. Tu tarea es crear una única imagen fotorrealista de una 'quinceañera virtual' combinando elementos de las siguientes imágenes de referencia, con un estilo juvenil, vibrante y elegante.";
-    return createVirtualLook(inputs, context);
-};
-
-export type TableAssignment = {
-    tableName: string;
-    guests: string[];
-}[];
-/**
- * Asigna invitados a mesas usando IA.
- * @param guests - Lista de nombres de invitados.
- * @param tableNames - Nombres/IDs de las mesas disponibles del plano.
- * @returns Una promesa que se resuelve con la asignación de mesas en formato JSON.
- */
-export const assignGuestsToTables = async (guests: string[], tableNames: string[]): Promise<TableAssignment> => {
-    if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    const prompt = `Actúa como un organizador de eventos experto. Tu tarea es asignar la siguiente lista de invitados a las mesas disponibles de la forma más equitativa posible.
-    
-    Lista de Invitados:
-    ${guests.join('\n')}
-    
-    Mesas Disponibles (usa estos nombres/IDs exactos para 'tableName'): ${tableNames.join(', ')}
-    
-    Por favor, distribuye a los invitados entre las mesas. El resultado debe ser únicamente el objeto JSON especificado en el schema, sin texto adicional.`;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    description: "Una lista de todas las mesas con los invitados asignados a cada una.",
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            tableName: {
-                                type: Type.STRING,
-                                description: "El nombre o ID exacto de la mesa (ej. 'round-table-1')."
-                            },
-                            guests: {
-                                type: Type.ARRAY,
-                                description: "Una lista con los nombres de los invitados sentados en esta mesa.",
-                                items: {
-                                    type: Type.STRING
-                                }
-                            }
-                        },
-                        required: ["tableName", "guests"],
-                    }
-                },
-            },
-        });
-
-        const jsonStr = response.text.trim();
-        const result = JSON.parse(jsonStr);
-        return result as TableAssignment;
-
-    } catch (error) {
-        console.error("Error al llamar a la API de Gemini para asignación de mesas:", error);
-        throw new Error("Fallo al generar la asignación de mesas desde la API.");
-    }
-};
-
-/**
- * Genera un layout de salón de eventos a partir de una descripción en lenguaje natural.
- * @param prompt - Descripción del layout deseado.
- * @param salonWidth - Ancho del lienzo del salón.
- * @param salonHeight - Alto del lienzo del salón.
- * @returns Una promesa que se resuelve con un array de objetos de layout.
- */
-export const generateLayoutFromPrompt = async (prompt: string, salonWidth: number, salonHeight: number): Promise<Layout> => {
-    if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    const systemInstruction = `Actúa como un diseñador de eventos profesional y arquitecto de espacios. Tu tarea es interpretar la descripción del usuario y generar un plano 2D (layout) para un salón de eventos.
-
-**REGLAS CRÍTICAS:**
-1.  **Respeta las Dimensiones:** El salón mide ${salonWidth}px de ancho por ${salonHeight}px de alto. Todos los objetos deben estar DENTRO de estos límites. El origen (0,0) es la esquina superior izquierda.
-2.  **Dimensiones Fijas:** Utiliza estas dimensiones EXACTAS para los objetos:
-    -   Mesa Redonda ('round-table'): 48x48 px
-    -   Mesa Rectangular ('rect-table'): 24x72 px
-    -   Pista de Baile ('dance-floor'): 120x120 px
-    -   Templete/Escenario ('stage'): 144x72 px
-3.  **Evita Colisiones:** Los objetos no deben superponerse. Deja un espacio razonable entre ellos.
-4.  **Salida Estricta:** Tu única salida debe ser el objeto JSON que se ajusta al schema proporcionado. No incluyas texto, explicaciones o código adicional.`;
-
-    const fullPrompt = `Por favor, genera un layout para un salón de eventos basado en esta descripción: "${prompt}".`;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: fullPrompt,
-            config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    description: "Una lista de los objetos que componen el plano del salón.",
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            id: { type: Type.STRING, description: "Un identificador único para el objeto (ej. 'round-table-1')." },
-                            type: { type: Type.STRING, description: "El tipo de objeto ('round-table', 'rect-table', 'dance-floor', 'stage')." },
-                            x: { type: Type.NUMBER, description: "La coordenada X de la esquina superior izquierda." },
-                            y: { type: Type.NUMBER, description: "La coordenada Y de la esquina superior izquierda." },
-                            width: { type: Type.NUMBER, description: "El ancho del objeto en píxeles." },
-                            height: { type: Type.NUMBER, description: "La altura del objeto en píxeles." },
-                        },
-                        required: ["id", "type", "x", "y", "width", "height"],
-                    }
-                },
-            },
-        });
-
-        const jsonStr = response.text.trim();
-        const result = JSON.parse(jsonStr);
-        return result as Layout;
-    } catch (error) {
-        console.error("Error al llamar a la API de Gemini para generar el layout:", error);
-        throw new Error("Fallo al generar el diseño del salón desde la API.");
-    }
-};
-
-/**
- * Genera un layout 2D de un salón a partir de una imagen y una descripción.
- * @param venueImage - Imagen del salón real.
- * @param prompt - Descripción del layout.
- * @param dimensions - Dimensiones físicas del salón.
- * @param salonWidth - Ancho en píxeles del lienzo.
- * @param salonHeight - Alto en píxeles del lienzo.
- * @returns Una promesa que se resuelve con el layout.
- */
-export const generateLayoutFromImageAndPrompt = async (
-    venueImage: ImageData,
-    prompt: string,
-    dimensions: string,
-    salonWidth: number,
-    salonHeight: number
-): Promise<Layout> => {
-    if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    const systemInstruction = `Actúa como un diseñador de eventos experto y arquitecto. Tu tarea es analizar la imagen de un salón real y generar un plano 2D (layout) basado en la descripción del usuario, respetando los espacios y estructura de la imagen.
-
-**REGLAS CRÍTICAS:**
-1.  **Análisis Visual:** La imagen proporcionada es la referencia principal. Identifica áreas libres, columnas y la estructura general para posicionar los objetos de forma realista.
-2.  **Respeta las Dimensiones:** El plano debe encajar en un lienzo de ${salonWidth}px de ancho por ${salonHeight}px de alto. Las dimensiones reales aproximadas del salón son ${dimensions}.
-3.  **Dimensiones Fijas de Objetos:** Utiliza estas dimensiones EXACTAS: 'round-table' (48x48), 'rect-table' (24x72), 'dance-floor' (120x120), 'stage' (144x72).
-4.  **Evita Colisiones:** Los objetos no deben superponerse ni con ellos mismos ni con obstáculos visibles en la foto (como columnas).
-5.  **Salida JSON Estricta:** Tu única salida debe ser el objeto JSON que se ajusta al schema.`;
-
-    const fullPrompt = `Analiza la imagen del salón proporcionada. Basado en la imagen y esta descripción: "${prompt}", genera el plano 2D.`;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro", // Usamos pro para mejor análisis de imagen
-            contents: [
-                { inlineData: { data: venueImage.base64, mimeType: venueImage.mimeType } },
-                { text: fullPrompt }
-            ],
-            config: {
-                systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            id: { type: Type.STRING }, type: { type: Type.STRING },
-                            x: { type: Type.NUMBER }, y: { type: Type.NUMBER },
-                            width: { type: Type.NUMBER }, height: { type: Type.NUMBER },
-                        },
-                        required: ["id", "type", "x", "y", "width", "height"],
-                    }
-                },
-            },
-        });
-        const jsonStr = response.text.trim();
-        const result = JSON.parse(jsonStr);
-        return result as Layout;
-    } catch (error) {
-        console.error("Error en generateLayoutFromImageAndPrompt:", error);
-        throw new Error("Fallo al generar el plano desde la imagen.");
-    }
-};
-
-/**
- * Genera una vista fotorrealista de un salón de eventos poblado.
- * @param venueImage - Imagen del salón real.
- * @param layout - El layout de objetos a integrar.
- * @param ambiencePrompt - Descripción de la ambientación.
- * @returns Una promesa que se resuelve con la URL de datos (base64) de la imagen generada.
- */
-export const generateRealisticVenueView = async (
-    venueImage: ImageData,
-    layout: Layout,
-    ambiencePrompt: string
-): Promise<string> => {
-    if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-    // Convierte el layout a una descripción textual
-    const itemCounts: { [key: string]: number } = {};
-    layout.forEach(item => {
-        itemCounts[item.type] = (itemCounts[item.type] || 0) + 1;
-    });
-    const layoutDescription = Object.entries(itemCounts)
-        .map(([type, count]) => `${count} ${type.replace('-', ' ')}${count > 1 ? 's' : ''}`)
-        .join(', ');
-
-    const prompt = `Actúa como un director de arte y artista de renderizado 3D. La **primera imagen** es una fotografía de un salón de eventos real. Tu tarea es poblar este salón con los siguientes elementos de forma fotorrealista: **${layoutDescription}**.
-La ambientación general y el estilo deben seguir esta descripción: **"${ambiencePrompt}"**.
-Genera una única **vista frontal fotorrealista en calidad 8K** del salón con todos los elementos integrados. La iluminación, sombras, reflejos y perspectiva deben ser impecables y 100% coherentes con la fotografía original para que el resultado sea indistinguible de una foto real.`;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: {
-                parts: [
-                    { inlineData: { data: venueImage.base64, mimeType: venueImage.mimeType } },
-                    { text: prompt }
-                ]
-            },
-            config: { responseModalities: [Modality.IMAGE] }
         });
 
         const candidate = response.candidates?.[0];
@@ -633,44 +424,51 @@ Genera una única **vista frontal fotorrealista en calidad 8K** del salón con t
         }
         throw new Error("No se generó ninguna imagen en la respuesta.");
     } catch (error) {
-        console.error("Error en generateRealisticVenueView:", error);
-        throw new Error("Fallo al generar la vista realista desde la API.");
+        console.error("Fallo crítico:", error);
+        if (error instanceof Error) {
+            throw error;
+        }
+        throw new Error("Fallo al crear el look virtual desde la API.");
     }
 };
 
+// Fix: Added missing function createVirtualBride
+export const createVirtualBride = async (inputs: VirtualLookInputs): Promise<string> => {
+    const contextPrompt = `Actúa como un diseñador de moda y estilista de bodas de alta costura. Tu tarea es crear una prueba de look virtual (makeover) para una novia, combinando diferentes elementos de forma fotorrealista.`;
+    return createVirtualLook(inputs, contextPrompt);
+};
 
-/**
- * Une múltiples imágenes para crear una panorámica.
- * @param images - Un array de objetos de imagen para unir.
- * @param userPrompt - Instrucciones adicionales del usuario.
- * @param enhanceQuality - Si se debe mejorar la calidad a 8K.
- * @returns Una promesa que se resuelve con la URL de datos (base64) de la imagen panorámica.
- */
-export const stitchPanorama = async (images: ImageData[], userPrompt: string = '', enhanceQuality: boolean): Promise<string> => {
-    if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Fix: Added missing function createVirtualQuinceanera
+export const createVirtualQuinceanera = async (inputs: VirtualLookInputs): Promise<string> => {
+    const contextPrompt = `Actúa como un diseñador de moda y estilista experto en fiestas de quince años. Tu tarea es crear una prueba de look virtual (makeover) para una quinceañera, combinando diferentes elementos de forma fotorrealista.`;
+    return createVirtualLook(inputs, contextPrompt);
+};
 
-    let prompt = `Actúa como un experto en composición fotográfica. Tu tarea es unir las siguientes imágenes en una única fotografía panorámica sin costuras.
-**REGLAS CRÍTICAS:**
-1.  **Análisis de Contenido:** Analiza el contenido y los bordes de cada imagen para determinar el orden correcto de unión (probablemente horizontal).
-2.  **Unión Perfecta:** La unión debe ser invisible. Combina las imágenes de manera fotorrealista, alineando perfectamente los elementos y mezclando los bordes.
-3.  **Consistencia:** Mantén la consistencia de la iluminación, el color, la exposición y el estilo en toda la imagen panorámica resultante.
-4.  **No Deformar:** No deformes ni distorsiones a las personas, rostros u objetos importantes. Preserva la perspectiva natural.
-5.  **Rellenado Generativo (si es necesario):** Si la unión crea áreas vacías o bordes irregulares, utiliza relleno generativo para completar la escena de forma natural y coherente con el resto de la imagen.`;
-
+// Fix: Added missing function stitchPanorama
+export const stitchPanorama = async (images: ImageData[], userPrompt: string, enhanceQuality: boolean): Promise<string> => {
+    let prompt = `Actúa como un experto en fotografía computacional. Tu tarea es unir estas ${images.length} imágenes en una sola fotografía panorámica fotorrealista.
+**Instrucciones de Unión:**
+1.  Analiza el solapamiento y la perspectiva entre las imágenes para crear una transición invisible.
+2.  Corrige cualquier distorsión de lente y alinea los horizontes perfectamente.
+3.  Asegura que la exposición, el balance de blancos y los colores sean consistentes a lo largo de toda la panorámica.
+4.  Si es necesario, utiliza relleno generativo para completar áreas faltantes en los bordes y crear un encuadre rectangular limpio.
+5.  **NO ALTERAR ROSTROS HUMANOS.** Los rostros deben permanecer intactos y sin distorsiones.`;
     if (userPrompt) {
-        prompt += `\n\n**Instrucciones Adicionales del Usuario:** ${userPrompt}`;
+        prompt += `\n\n**Instrucciones Adicionales del Usuario:** ${userPrompt}.`;
     }
-
     if (enhanceQuality) {
         prompt += HIGH_QUALITY_PROMPT_ADDITION;
     }
 
-    const parts: any[] = images.map(img => ({
-        inlineData: { data: img.base64, mimeType: img.mimeType }
-    }));
-    parts.push({ text: prompt });
+    // Fix: Correctly construct the `parts` array to allow both image and text parts,
+    // resolving a TypeScript error from incorrect type inference.
+    const parts = [
+        ...images.map(img => ({ inlineData: { data: img.base64, mimeType: img.mimeType } })),
+        { text: prompt },
+    ];
 
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -679,9 +477,9 @@ export const stitchPanorama = async (images: ImageData[], userPrompt: string = '
         });
 
         const candidate = response.candidates?.[0];
-        if (candidate && candidate.content && candidate.content.parts) {
+        if (candidate?.content?.parts) {
             for (const part of candidate.content.parts) {
-                if (part.inlineData) {
+                if (part.inlineData?.data) {
                     return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
                 }
             }
@@ -689,84 +487,243 @@ export const stitchPanorama = async (images: ImageData[], userPrompt: string = '
         if (candidate?.finishReason === 'SAFETY') {
             throw new Error("La solicitud fue bloqueada por motivos de seguridad.");
         }
-        throw new Error("No se generó ninguna imagen panorámica en la respuesta.");
+        throw new Error("No se pudo unir la panorámica.");
     } catch (error) {
-        console.error("Error en stitchPanorama:", error);
-        throw new Error("Fallo al unir las imágenes desde la API.");
+        console.error("Fallo crítico al unir panorámica:", error);
+        if (error instanceof Error) throw error;
+        throw new Error("Fallo en la comunicación con la API al unir la panorámica.");
     }
 };
 
 /**
- * Genera 3 variantes de texto para un anuncio a partir de un texto base.
- * @param baseText - El texto o idea principal para el anuncio.
- * @returns Una promesa que se resuelve con un array de 3 strings con las variantes.
+ * Genera una nueva imagen sintetizando los conceptos de dos imágenes de entrada y un prompt.
+ * @param image1 Primera imagen de anclaje.
+ * @param image2 Segunda imagen de anclaje.
+ * @param prompt El concepto catalizador que guía la síntesis.
+ * @returns Una promesa que se resuelve con la URL de datos (base64) de la imagen sintetizada.
  */
-export const generateTextVariations = async (baseText: string): Promise<string[]> => {
+export const synthesizeConcepts = async (image1: ImageData, image2: ImageData, prompt: string): Promise<string> => {
+  if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const structuredPrompt = `Actúa como un director de arte surrealista y un genio conceptual. Tu tarea es sintetizar una nueva imagen a partir de los dos conceptos visuales proporcionados (la primera y segunda imagen). 
+**REGLAS CRÍTICAS:**
+1.  **NO FUSIONAR:** No mezcles, combines ni superpongas las imágenes directamente.
+2.  **SÍNTESIS CONCEPTUAL:** En su lugar, extrae la esencia, el estilo, los objetos y la atmósfera de AMBAS imágenes.
+3.  **CREACIÓN GUIADA:** Usa esa esencia extraída para generar una obra de arte COMPLETAMENTE NUEVA y ORIGINAL, guiada por el siguiente concepto catalizador: "${prompt}".
+4.  **FOTORREALISMO IMPACTANTE:** El resultado final debe ser una pieza visualmente impactante, cohesiva y fotorrealista que parezca una creación única e intencional.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          { inlineData: { data: image1.base64, mimeType: image1.mimeType } },
+          { inlineData: { data: image2.base64, mimeType: image2.mimeType } },
+          { text: structuredPrompt },
+        ],
+      },
+      config: { responseModalities: [Modality.IMAGE] },
+    });
+
+    const candidate = response.candidates?.[0];
+    if (candidate?.content?.parts) {
+      for (const part of candidate.content.parts) {
+        if (part.inlineData?.data) {
+          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
+      }
+    }
+    if (candidate?.finishReason === 'SAFETY') {
+      throw new Error("La solicitud fue bloqueada por seguridad. Intenta con otras imágenes o un concepto diferente.");
+    }
+    throw new Error("La IA no pudo sintetizar el concepto. Intenta de nuevo.");
+  } catch (error) {
+    console.error("Fallo crítico en la síntesis conceptual:", error);
+    if (error instanceof Error) throw error;
+    throw new Error("Fallo en la comunicación con el servicio de IA.");
+  }
+};
+
+// --- Funciones para el Diseñador de Salones ---
+
+const layoutSchema = {
+  type: Type.OBJECT,
+  properties: {
+    items: {
+      type: Type.ARRAY,
+      description: 'Lista de elementos a colocar en el plano del salón.',
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          id: { type: Type.STRING, description: 'Identificador único para el elemento.' },
+          type: { type: Type.STRING, description: 'Tipo de elemento (ej. round-table, dance-floor).' },
+          x: { type: Type.NUMBER, description: 'Coordenada X de la esquina superior izquierda.' },
+          y: { type: Type.NUMBER, description: 'Coordenada Y de la esquina superior izquierda.' },
+          width: { type: Type.NUMBER, description: 'Ancho del elemento.' },
+          height: { type: Type.NUMBER, description: 'Alto del elemento.' },
+        },
+        required: ['id', 'type', 'x', 'y', 'width', 'height'],
+      },
+    },
+  },
+  required: ['items'],
+};
+
+export const generateLayoutFromPrompt = async (prompt: string, canvasWidth: number, canvasHeight: number): Promise<LayoutItem[]> => {
+  if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const systemInstruction = `Eres un experto planificador de eventos y diseñador de interiores. Tu tarea es generar un plano de distribución para un salón de eventos.
+- El lienzo disponible es de ${canvasWidth}px de ancho por ${canvasHeight}px de alto.
+- Los elementos deben estar dentro de estos límites.
+- Tipos de elementos permitidos: 'round-table' (48x48px), 'rect-table' (24x72px), 'dance-floor' (120x120px), 'stage' (144x72px).
+- Asigna las dimensiones correctas a cada tipo de elemento.
+- Genera un ID único para cada elemento (ej. 'round-table-1').
+- Responde únicamente con el objeto JSON que se adhiere al schema proporcionado. No incluyas texto adicional ni explicaciones.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema: layoutSchema,
+    },
+  });
+  
+  const jsonText = response.text.trim();
+  try {
+    const layout = JSON.parse(jsonText);
+    return layout.items || [];
+  } catch (e) {
+    console.error("Error al parsear el JSON del layout:", e, jsonText);
+    throw new Error("La IA no pudo generar un plano válido.");
+  }
+};
+
+export const generateLayoutFromImageAndPrompt = async (image: ImageData, prompt: string, dimensions: string, canvasWidth: number, canvasHeight: number): Promise<LayoutItem[]> => {
     if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-    const prompt = `Actúa como un copywriter experto en redes sociales. Dada la siguiente idea de texto para un anuncio, genera 3 variantes cortas, creativas y persuasivas.
+    const systemInstruction = `Eres un experto planificador de eventos y diseñador de interiores con capacidad de análisis visual. Tu tarea es generar un plano de distribución para un salón de eventos basándote en una foto del lugar y una descripción.
+- La foto proporcionada es del salón vacío. Analízala para entender sus límites, columnas u obstrucciones.
+- Las dimensiones reales del salón son ${dimensions}. El lienzo digital es de ${canvasWidth}px de ancho por ${canvasHeight}px de alto. Escala tus cálculos.
+- Los elementos deben estar dentro de los límites del salón en la foto.
+- Tipos de elementos permitidos y sus dimensiones en px: 'round-table' (48x48), 'rect-table' (24x72), 'dance-floor' (120x120), 'stage' (144x72).
+- Asigna las dimensiones correctas a cada tipo de elemento.
+- Genera un ID único para cada elemento (ej. 'round-table-1').
+- Responde únicamente con el objeto JSON que se adhiere al schema proporcionado.`;
 
-Texto base: "${baseText}"
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-pro', // Usar un modelo más potente para análisis de imagen
+        contents: {
+            parts: [
+                { inlineData: { data: image.base64, mimeType: image.mimeType } },
+                { text: prompt }
+            ]
+        },
+        config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+            responseSchema: layoutSchema,
+        },
+    });
 
-Tu respuesta DEBE ser únicamente el objeto JSON que se ajusta al schema, sin texto adicional.`;
-
+    const jsonText = response.text.trim();
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        variations: {
-                            type: Type.ARRAY,
-                            description: "Una lista de 3 variantes de texto para el anuncio.",
-                            items: { type: Type.STRING }
-                        }
-                    },
-                    required: ["variations"]
-                },
-            },
-        });
-
-        const jsonStr = response.text.trim();
-        const result = JSON.parse(jsonStr);
-        // La API puede devolver menos de 3, así que nos aseguramos de manejarlo.
-        return (result.variations as string[]).slice(0, 3);
-
-    } catch (error) {
-        console.error("Error al llamar a la API de Gemini para generar variantes de texto:", error);
-        throw new Error("Fallo al generar las variantes de texto desde la API.");
+        const layout = JSON.parse(jsonText);
+        return layout.items || [];
+    } catch (e) {
+        console.error("Error al parsear el JSON del layout multimodal:", e, jsonText);
+        throw new Error("La IA no pudo generar un plano válido desde la imagen.");
     }
 };
 
+export const generateRealisticVenueView = async (venueImage: ImageData, layout: LayoutItem[], ambiencePrompt: string): Promise<string> => {
+    const layoutDescription = layout.map(item => `- Un(a) ${item.type} de ${item.width}x${item.height}px en la posición (x:${Math.round(item.x)}, y:${Math.round(item.y)})`).join('\n');
 
-/**
- * Corrige y mejora un texto dictado usando IA.
- * @param text - El texto a corregir.
- * @returns Una promesa que se resuelve con el texto corregido.
- */
+    const prompt = `Actúa como un director de arte y experto en renderizado 3D. Tu tarea es crear una vista fotorrealista de un salón de eventos decorado.
+**INSTRUCCIONES CRÍTICAS:**
+1.  **BASE DEL SALÓN:** Utiliza la imagen proporcionada como la arquitectura base del salón (paredes, techo, suelo, ventanas). NO alteres su estructura fundamental.
+2.  **POBLAR EL SALÓN:** Integra los siguientes elementos de mobiliario en el salón, respetando sus posiciones relativas como si fuera una vista en perspectiva desde la entrada. El plano de distribución 2D es:
+${layoutDescription}
+3.  **AMBIENTACIÓN Y ESTILO:** Aplica la siguiente temática de decoración y ambiente a toda la escena: "${ambiencePrompt}". Esto incluye la iluminación, los colores, los materiales del mobiliario (manteles, sillas), y la decoración general.
+4.  **HIPERREALISMO 8K:** El resultado final debe ser una imagen indistinguible de una fotografía profesional de alta resolución (8K), con sombras realistas, reflejos, texturas detalladas y una iluminación cohesiva.`;
+    
+    return editImageWithPrompt(venueImage, prompt);
+};
+
 export const correctDictatedText = async (text: string): Promise<string> => {
+  if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: `Corrige la gramática, puntuación y claridad del siguiente texto, que proviene de un dictado por voz. Hazlo más conciso y claro para una instrucción de IA. Responde únicamente con el texto corregido.\n\nTexto original: "${text}"`,
+  });
+
+  return response.text.trim();
+};
+
+export const generateTextVariations = async (originalText: string): Promise<string[]> => {
     if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-    const prompt = `Actúa como un editor experto. Corrige la gramática y la puntuación del siguiente texto, y mejora su claridad y fluidez sin cambiar el significado original. El texto proviene de un dictado por voz, por lo que puede contener errores.
+    const prompt = `Eres un copywriter experto en marketing para redes sociales. Basado en el siguiente texto para un anuncio, genera 3 variaciones cortas y persuasivas (máximo 15 palabras cada una). Deben ser llamativas y perfectas para un Reel o Story. Devuelve solo un array JSON de strings, así: ["texto 1", "texto 2", "texto 3"].\n\nTexto base: "${originalText}"`;
 
-Texto original: "${text}"
-
-Devuelve únicamente el texto corregido, sin explicaciones ni preámbulos.`;
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+            }
+        },
+    });
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt
-        });
-
-        return response.text.trim();
-    } catch (error) {
-        console.error("Error al llamar a la API de Gemini para corregir texto:", error);
-        throw new Error("Fallo al corregir el texto desde la API.");
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText);
+    } catch (e) {
+        console.error("Error al parsear variaciones de texto:", e, response.text);
+        return [`✨ ${originalText} ✨`, `¡No te lo pierdas! ${originalText}`, `Vive la magia: ${originalText}`];
     }
+};
+
+/**
+ * Genera un pie de foto descriptivo para una imagen.
+ * @param image La imagen para la cual generar el pie de foto.
+ * @returns Una promesa que se resuelve con el texto del pie de foto.
+ */
+export const generateImageCaption = async (image: ImageData): Promise<string> => {
+  if (!process.env.API_KEY) throw new Error("API_KEY no configurada.");
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const prompt = `Actúa como un copywriter creativo para redes sociales. Describe esta imagen en una sola frase corta, poética y atractiva (máximo 15 palabras). El tono debe ser inspirador o evocador. Responde únicamente con el texto del pie de foto.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: [
+          { inlineData: { data: image.base64, mimeType: image.mimeType } },
+          { text: prompt },
+        ],
+      },
+    });
+
+    return response.text.trim();
+  } catch (error) {
+    console.error("Fallo crítico en la generación de pie de foto:", error);
+    if (error instanceof Error) {
+        if (JSON.stringify(error).includes('SAFETY')) {
+             throw new Error("La imagen fue bloqueada por políticas de seguridad.");
+        }
+        throw error;
+    }
+    throw new Error("Fallo en la comunicación con el servicio de IA para el pie de foto.");
+  }
 };

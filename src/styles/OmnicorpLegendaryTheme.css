@@ -1,0 +1,381 @@
+/* OMNICORP LEGENDARY THEME - v6.0 */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;600&display=swap');
+
+/* ========= COLORES INSTITUCIONALES ========= */
+:root {
+  --color-bg: #0b0b0b;            /* Negro absoluto */
+  --color-panel: #1a1a1a;         /* Negro grisáceo */
+  --color-vino: #800020;          /* Vino profundo */
+  --color-oro: #FFD700;           /* Oro real */
+  --color-plata: #C0C0C0;         /* Plata suave */
+  --color-text: #f5f5f5;          /* Blanco refinado */
+  --color-hover: #b22222;         /* Rojo vino brillante */
+}
+
+/* ========= ESTILO GLOBAL ========= */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Rajdhani', sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ========= CABECERA / LOGO ========= */
+.header-logo {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  background: linear-gradient(to right, var(--color-oro), var(--color-vino));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-align: center;
+  margin: 30px 0;
+}
+
+/* ========= BOTONES ========= */
+.btn-legendary {
+  background-color: transparent;
+  border: 2px solid var(--color-oro);
+  color: var(--color-oro);
+  padding: 10px 22px;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-family: 'Orbitron', sans-serif;
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+}
+
+.btn-legendary:hover:not(:disabled) {
+  background-color: var(--color-oro);
+  color: var(--color-bg);
+  transform: scale(1.05);
+  box-shadow: 0 0 10px var(--color-oro);
+}
+
+.btn-legendary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  background-color: transparent;
+  color: var(--color-oro);
+}
+
+/* ========= PANEL DE AVATARES / PANELES LATERALES ========= */
+.avatar-box {
+  background-color: var(--color-panel);
+  border-left: 4px solid var(--color-vino);
+  padding: 16px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.avatar-box:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.2);
+}
+
+.avatar-box img {
+  width: 100%;
+  border-radius: 12px;
+  border: 2px solid var(--color-plata);
+}
+
+/* ========= FRASE DE PODER ========= */
+.quote-box {
+  font-style: italic;
+  text-align: center;
+  color: var(--color-plata);
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+/* ========= BARRA SUPERIOR ========= */
+.topbar {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--color-plata);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* ========= PIE DE PÁGINA / FIRMA ========= */
+.footer-sello {
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-plata);
+  margin: 30px 0 10px 0;
+  opacity: 0.5;
+}
+
+/* ========= ANIMACIÓN DE ENTRADA ========= */
+body {
+  animation: fadeZetaIn 1.2s ease-out;
+}
+
+@keyframes fadeZetaIn {
+  0% { opacity: 0; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ========= COMPONENTES ESPECÍFICOS ========= */
+
+/* Sidebar */
+.sidebar-btn {
+  background-color: transparent;
+  border: none;
+  color: var(--color-text);
+  padding: 10px 15px;
+  font-weight: 600;
+  text-transform: none;
+  font-family: 'Rajdhani', sans-serif;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.sidebar-btn:hover {
+    background-color: rgba(255, 215, 0, 0.1);
+    color: var(--color-oro);
+}
+
+.sidebar-btn.active {
+    background: linear-gradient(90deg, rgba(128, 0, 32, 0.5), transparent);
+    color: white;
+    font-weight: bold;
+}
+
+/* New: Hover effect for navigation groups */
+.nav-group:hover {
+  border-left-color: var(--color-oro);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.1);
+}
+
+/* Paneles generales */
+.editor-root { display: flex; height: 100%; width: 100%; padding: 8px; box-sizing: border-box;}
+.editor-workspace { display: flex; gap: 1rem; width: 100%; }
+.image-area { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.25); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 16px; position: relative; overflow: hidden; }
+.tools-panel { width: 380px; flex-shrink: 0; }
+.panel-section-title { color: var(--color-oro); font-weight: bold; margin-bottom: 0.5rem; display: block; text-transform: uppercase; font-size: 14px; }
+.prompt-area { width: 100%; background-color: rgba(0,0,0,0.3); border: 1px solid var(--color-plata); border-radius: 8px; padding: 8px; color: var(--color-text); min-height: 80px; box-sizing: border-box;}
+.panel-footer { margin-top: auto; padding-top: 1rem; border-top: 1px solid rgba(192, 192, 192, 0.3); }
+.button-group { display: flex; gap: 1rem; }
+.panel-header { margin-bottom: 1rem; }
+.panel-header p { color: var(--color-plata); font-size: 14px; }
+.loading-overlay { position: absolute; inset: 0; background-color: rgba(0,0,0,0.7); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 12px; }
+.spinner { width: 48px; height: 48px; border: 4px solid rgba(255,215,0,0.3); border-top-color: var(--color-oro); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ========= COMPONENTES ESPECÍFICOS (ADICIONES) ========= */
+
+/* Sidebar */
+/* New: Hover effect for navigation groups */
+.nav-group {
+  border-left: 2px solid transparent; /* Initial border */
+  transition: border-left-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.nav-group:hover {
+  border-left-color: var(--color-oro); /* Highlight on hover */
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.1);
+}
+
+.image-caption {
+  position: absolute;
+  bottom: 1.5rem; /* Corresponde al padding del contenedor padre */
+  left: 1.5rem;
+  right: 1.5rem;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  color: var(--color-text);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+  border-top: 1px solid rgba(255, 215, 0, 0.4);
+  animation: fadeInCaption 0.5s ease-out;
+  pointer-events: none; /* No debe interferir con el slider */
+}
+
+@keyframes fadeInCaption {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Toast Notifications */
+.toast {
+  padding: 10px 20px;
+  border-radius: 8px;
+  color: var(--color-text);
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  min-width: 250px;
+  text-align: center;
+}
+
+.toast.success {
+  background-color: rgba(40, 167, 69, 0.9); /* Green */
+}
+
+.toast.error {
+  background-color: rgba(220, 53, 69, 0.9); /* Red */
+}
+
+/* Full Viewport Mode for specific components */
+.wrap.view-mode-full {
+    grid-template-columns: 260px 1fr; /* Sidebar and Main content */
+    height: calc(100vh - 64px); /* Full height minus topbar */
+}
+
+.wrap.view-mode-full > main {
+    padding: 0; /* Remove main padding in full mode */
+    display: flex; /* Ensure main takes full height and width */
+    width: 100%;
+    height: 100%;
+}
+
+.wrap.view-mode-full .view-section.active {
+    width: 100%;
+    height: 100%;
+}
+
+/* Generic Image Zoom Container */
+.image-zoom-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0,0,0,0.2);
+  border-radius: 12px;
+  cursor: grab;
+}
+
+.image-zoom-container.grabbing {
+  cursor: grabbing;
+}
+
+.image-zoom-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  transition: transform 0.05s ease-out; /* Smoother real-time transform */
+}
+
+.image-zoom-content img, .image-zoom-content video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  pointer-events: none; /* Prevent image dragging */
+  user-select: none;
+  display: block; /* Remove extra space below image */
+}
+
+.zoom-controls {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(5px);
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  z-index: 20;
+}
+
+.zoom-controls button {
+  background: var(--color-panel);
+  border: 1px solid var(--color-plata);
+  color: var(--color-text);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.zoom-controls button:hover:not(:disabled) {
+  background-color: var(--color-oro);
+  color: var(--color-bg);
+  border-color: var(--color-oro);
+}
+
+.zoom-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Gallery items for VideoMappingPro */
+.gallery-item-videomap {
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gallery-item-videomap:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.gallery-item-videomap.selected {
+  border: 3px solid var(--color-oro);
+  box-shadow: 0 0 15px var(--color-oro);
+  transform: scale(1.02);
+}
+
+.gallery-item-videomap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-item-videomap .label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.25rem;
+  text-align: center;
+  font-weight: 600;
+}
